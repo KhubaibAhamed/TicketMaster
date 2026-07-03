@@ -784,6 +784,24 @@
                        margin-bottom:-1px; font-family:var(--font-ui);">
                         Password Requests
                     </button>
+                    <button id="settingsTab-tabSecurity" onclick="switchSettingsTab('tabSecurity')"
+                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
+                       cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
+                       margin-bottom:-1px; font-family:var(--font-ui);">
+                        Security Log
+                    </button>
+                    <button id="settingsTab-tabSla" onclick="switchSettingsTab('tabSla')"
+                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
+                       cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
+                       margin-bottom:-1px; font-family:var(--font-ui);">
+                        SLA Settings
+                    </button>
+                    <button id="settingsTab-tabRouting" onclick="switchSettingsTab('tabRouting')"
+                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
+                       cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
+                       margin-bottom:-1px; font-family:var(--font-ui);">
+                        Categories &amp; Routing
+                    </button>
                 </div>
 
                 <!-- Tab: User Directory -->
@@ -867,12 +885,234 @@
                         <p style="color:var(--g-text-muted); font-size:13px;">Loading requests...</p>
                     </div>
                 </div>
+
+                <!-- Tab: Security Log -->
+                <div id="settingsPanel-tabSecurity" style="display:none;">
+                    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:20px;">
+                        <div style="min-width:160px;">
+                            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">Event Type</label>
+                            <select id="secLogEventType" onchange="loadSecurityLog(0)"
+                                    style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                                <option value="">All events</option>
+                                <option value="LOGIN_SUCCESS">Login success</option>
+                                <option value="LOGIN_FAILURE">Login failure</option>
+                                <option value="LOGIN_BLOCKED">Login blocked</option>
+                                <option value="LOGOUT">Logout</option>
+                                <option value="TOKEN_REFRESHED">Token refreshed</option>
+                            </select>
+                        </div>
+                        <div style="min-width:160px;">
+                            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">Username</label>
+                            <input type="text" id="secLogUsername" placeholder="Filter by username"
+                                   onkeydown="if(event.key==='Enter') loadSecurityLog(0)"
+                                   style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui); box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">From</label>
+                            <input type="date" id="secLogFrom" onchange="loadSecurityLog(0)"
+                                   style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">To</label>
+                            <input type="date" id="secLogTo" onchange="loadSecurityLog(0)"
+                                   style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                        </div>
+                        <button class="g-btn" onclick="clearSecurityLogFilters()"
+                                style="padding:8px 16px; font-size:13px;">Clear</button>
+                    </div>
+
+                    <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; overflow:hidden;">
+                        <table class="data-table">
+                            <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>Username</th>
+                                <th>IP Address</th>
+                                <th>Detail</th>
+                                <th>Occurred At</th>
+                            </tr>
+                            </thead>
+                            <tbody id="secLogBody">
+                            <tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:32px;">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                        <span id="secLogPageInfo" style="font-size:12px; color:var(--g-text-muted);"></span>
+                        <div style="display:flex; gap:8px;">
+                            <button class="g-btn" id="secLogPrevBtn" onclick="loadSecurityLog(secLogCurrentPage - 1)" style="padding:6px 14px; font-size:13px;">Previous</button>
+                            <button class="g-btn" id="secLogNextBtn" onclick="loadSecurityLog(secLogCurrentPage + 1)" style="padding:6px 14px; font-size:13px;">Next</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: SLA Settings -->
+                <div id="settingsPanel-tabSla" style="display:none;">
+                    <div style="max-width:560px; background:var(--g-surface); border:1px solid var(--g-border);
+                    border-radius:16px; padding:32px;">
+                        <h3 style="margin:0 0 6px 0; font-family:var(--font-display); font-size:18px;">SLA Response Windows</h3>
+                        <p style="margin:0 0 24px 0; font-size:13px; color:var(--g-text-muted);">
+                            How much time agents have to resolve a ticket before it's considered breached, by priority.
+                            Changes apply to new tickets and to the SLA warning/critical checks going forward —
+                            due dates already set on existing tickets are not recalculated.
+                        </p>
+
+                        <div id="slaConfigMsg" style="display:none; padding:12px 16px; border-radius:8px;
+                                      margin-bottom:20px; font-size:13px; font-weight:500;"></div>
+
+                        <div style="display:flex; flex-direction:column; gap:18px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
+                                        padding:14px 16px; border:1px solid var(--g-border); border-radius:10px;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <span style="width:10px; height:10px; border-radius:50%; background:#EA4335; display:inline-block;"></span>
+                                    <span style="font-size:14px; font-weight:500;">High priority</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <input type="number" id="slaHighHours" min="1" step="1"
+                                           style="width:80px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                    <span style="font-size:13px; color:var(--g-text-muted);">hours</span>
+                                </div>
+                            </div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
+                                        padding:14px 16px; border:1px solid var(--g-border); border-radius:10px;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <span style="width:10px; height:10px; border-radius:50%; background:#F9AB00; display:inline-block;"></span>
+                                    <span style="font-size:14px; font-weight:500;">Medium priority</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <input type="number" id="slaMediumHours" min="1" step="1"
+                                           style="width:80px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                    <span style="font-size:13px; color:var(--g-text-muted);">hours</span>
+                                </div>
+                            </div>
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
+                                        padding:14px 16px; border:1px solid var(--g-border); border-radius:10px;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    <span style="width:10px; height:10px; border-radius:50%; background:#34A853; display:inline-block;"></span>
+                                    <span style="font-size:14px; font-weight:500;">Low priority</span>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <input type="number" id="slaLowHours" min="1" step="1"
+                                           style="width:80px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                    <span style="font-size:13px; color:var(--g-text-muted);">hours</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="g-btn g-btn-primary" onclick="saveSlaConfig()"
+                                style="margin-top:24px; padding:10px 24px; font-size:13px;">
+                            Save Changes
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab: Categories & Routing -->
+                <div id="settingsPanel-tabRouting" style="display:none;">
+                    <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:24px; align-items:start;">
+
+                        <!-- Categories & Sub-categories -->
+                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                            <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">Categories</h3>
+                            <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
+                                Categories and sub-categories used when raising a ticket.
+                            </p>
+
+                            <div id="catMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:13px; font-weight:500;"></div>
+
+                            <div style="display:flex; gap:8px; margin-bottom:18px;">
+                                <input type="text" id="newCategoryName" placeholder="New category name"
+                                       style="flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                                <button class="g-btn g-btn-primary" onclick="createCategory()" style="padding:8px 16px; font-size:13px;">Add</button>
+                            </div>
+
+                            <div id="categoryTreeList" style="display:flex; flex-direction:column; gap:10px;">
+                                <p style="color:var(--g-text-muted); font-size:13px;">Loading categories...</p>
+                            </div>
+                        </div>
+
+                        <!-- Routing Rules -->
+                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                            <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">Routing Rules</h3>
+                            <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
+                                Evaluated in order (lowest first). The first matching rule sets the target queue for a new ticket.
+                                Leave category or priority as "Any" to match everything.
+                            </p>
+
+                            <div id="routingMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:13px; font-weight:500;"></div>
+
+                            <!-- Add rule form -->
+                            <div style="display:grid; grid-template-columns: 60px 1fr 1fr 1fr auto; gap:8px; margin-bottom:18px; align-items:end;">
+                                <div>
+                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Order</label>
+                                    <input type="number" id="newRuleOrder" min="1" step="1" value="1"
+                                           style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Category</label>
+                                    <select id="newRuleCategory" style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
+                                        <option value="">Any</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Priority</label>
+                                    <select id="newRulePriority" style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
+                                        <option value="">Any</option>
+                                        <option value="HIGH">High</option>
+                                        <option value="MEDIUM">Medium</option>
+                                        <option value="LOW">Low</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Target Queue</label>
+                                    <input type="text" id="newRuleQueue" placeholder="e.g. Network Team"
+                                           style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
+                                </div>
+                                <button class="g-btn g-btn-primary" onclick="createRoutingRule()" style="padding:8px 16px; font-size:13px;">Add</button>
+                            </div>
+
+                            <div style="background:var(--g-background); border:1px solid var(--g-border); border-radius:12px; overflow:hidden;">
+                                <table class="data-table">
+                                    <thead>
+                                    <tr>
+                                        <th style="width:60px;">Order</th>
+                                        <th>Category</th>
+                                        <th>Priority</th>
+                                        <th>Target Queue</th>
+                                        <th style="width:60px;"></th>
+                                    </tr>
+                                    </thead>
+                                    <tbody id="routingRulesBody">
+                                    <tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:24px;">Loading...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="viewReports" class="app-view">
                 <div class="dashboard-header">
                     <h2>Agent Performance</h2>
                     <p>Resolution velocity, response times and SLA compliance per agent.</p>
+                </div>
+
+                <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
+                    <div>
+                        <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">From</label>
+                        <input type="date" id="reportFrom" onchange="activeRangePreset = null; loadAgentPerformance()"
+                               style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                    </div>
+                    <div>
+                        <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">To</label>
+                        <input type="date" id="reportTo" onchange="activeRangePreset = null; loadAgentPerformance()"
+                               style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                    </div>
+                    <button class="g-btn" id="presetBtn7" onclick="setReportRangePreset(7)" style="padding:8px 14px; font-size:13px;">Last 7 days</button>
+                    <button class="g-btn" id="presetBtn30" onclick="setReportRangePreset(30)" style="padding:8px 14px; font-size:13px;">Last 30 days</button>
+                    <button class="g-btn" id="presetBtnAll" onclick="clearReportRange()" style="padding:8px 14px; font-size:13px;">All time</button>
+                    <span id="reportRangeLabel" style="font-size:12px; color:var(--g-text-muted); margin-left:4px;"></span>
                 </div>
 
                 <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px;
@@ -964,7 +1204,7 @@
 
         <div class="g-input-group">
             <textarea id="description" placeholder=" " rows="4" required
-              maxlength="1000" oninput="updateCharCounter()"></textarea>
+                      maxlength="1000" oninput="updateCharCounter()"></textarea>
             <label for="description">Detailed Description <span style="color: var(--g-red);">*</span></label>
         </div>
         <div class="char-counter" id="descCharCounter">0 / 1000</div>

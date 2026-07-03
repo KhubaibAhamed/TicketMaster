@@ -10,4 +10,6 @@ import java.util.List;
 public interface RoutingRuleRepository extends JpaRepository<RoutingRule, Long> {
     // Automatically generates: SELECT * FROM routing_rules ORDER BY rule_order ASC
     List<RoutingRule> findAllByOrderByRuleOrderAsc();
+
+    boolean existsByCategoryId(Long categoryId);
 }

@@ -314,8 +314,18 @@ async function loadAgentPerformance() {
     if (!tbody) return;
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--g-text-muted); padding:32px;">Loading...</td></tr>';
 
+    const from = document.getElementById('reportFrom')?.value;
+    const to   = document.getElementById('reportTo')?.value;
+
+    const params = new URLSearchParams();
+    if (from) params.set('from', from);
+    if (to)   params.set('to', to);
+    const query = params.toString() ? `?${params.toString()}` : '';
+
+    updateReportRangeLabel(from, to);
+
     try {
-        const res = await fetchWithAuth('/api/reports/agent-performance', {
+        const res = await fetchWithAuth(`/api/reports/agent-performance${query}`, {
             headers: authHeaders()
         });
         if (!res.ok) return;
@@ -366,6 +376,59 @@ async function loadAgentPerformance() {
         console.error('Failed to load agent performance:', e);
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--g-red); padding:32px;">Failed to load report.</td></tr>';
     }
+}
+
+function toDateInputValue(date) {
+    // yyyy-MM-dd, in local time (not UTC) so it matches what <input type="date"> expects
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+let activeRangePreset = 'presetBtnAll'; // tracks which quick-filter button is highlighted
+
+function highlightActiveRangeButton() {
+    ['presetBtn7', 'presetBtn30', 'presetBtnAll'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const isActive = id === activeRangePreset;
+        btn.style.background = isActive ? 'var(--g-blue)' : '';
+        btn.style.color = isActive ? '#fff' : '';
+    });
+}
+
+function setReportRangePreset(days) {
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - (days - 1));
+
+    document.getElementById('reportFrom').value = toDateInputValue(from);
+    document.getElementById('reportTo').value   = toDateInputValue(to);
+    activeRangePreset = days === 7 ? 'presetBtn7' : days === 30 ? 'presetBtn30' : null;
+    loadAgentPerformance();
+}
+
+function clearReportRange() {
+    document.getElementById('reportFrom').value = '';
+    document.getElementById('reportTo').value   = '';
+    activeRangePreset = 'presetBtnAll';
+    loadAgentPerformance();
+}
+
+function updateReportRangeLabel(from, to) {
+    const label = document.getElementById('reportRangeLabel');
+    if (!label) return;
+    if (!from && !to) {
+        label.innerText = 'Showing: all time';
+    } else if (from && to) {
+        label.innerText = `Showing: ${from} to ${to}`;
+    } else if (from) {
+        label.innerText = `Showing: from ${from}`;
+    } else {
+        label.innerText = `Showing: through ${to}`;
+    }
+    highlightActiveRangeButton();
 }
 
 async function loadVolumeTrend(days) {
@@ -1559,7 +1622,7 @@ async function adminRegisterUser() {
 }
 
 function switchSettingsTab(tabId) {
-    ['tabUsers', 'tabRegister', 'tabRequests'].forEach(id => {
+    ['tabUsers', 'tabRegister', 'tabRequests', 'tabSecurity', 'tabSla', 'tabRouting'].forEach(id => {
         const panel = document.getElementById('settingsPanel-' + id);
         const btn   = document.getElementById('settingsTab-' + id);
         if (!panel || !btn) return;
@@ -1571,6 +1634,9 @@ function switchSettingsTab(tabId) {
 
     if (tabId === 'tabUsers')    loadUserDirectory();
     if (tabId === 'tabRequests') loadPasswordRequests();
+    if (tabId === 'tabSecurity') loadSecurityLog(0);
+    if (tabId === 'tabSla')      loadSlaConfig();
+    if (tabId === 'tabRouting')  loadCategoryAndRoutingManagement();
 }
 
 function updateRoleSelection() {
@@ -1768,9 +1834,387 @@ async function loadPasswordRequests() {
     }
 }
 
+// --- Security Event Log (Tier 3) ---
+let secLogCurrentPage = 0;
+let secLogTotalPages  = 0;
+
+const SEC_EVENT_LABELS = {
+    LOGIN_SUCCESS:   { text: 'Login success',   color: '#34A853', bg: '#E6F4EA' },
+    LOGIN_FAILURE:   { text: 'Login failure',   color: '#EA4335', bg: '#FCE8E6' },
+    LOGIN_BLOCKED:   { text: 'Login blocked',   color: '#EA4335', bg: '#FCE8E6' },
+    LOGOUT:          { text: 'Logout',          color: '#5F6368', bg: '#F1F3F4' },
+    TOKEN_REFRESHED: { text: 'Token refreshed', color: '#1A73E8', bg: '#E8F0FE' }
+};
+
+function clearSecurityLogFilters() {
+    document.getElementById('secLogEventType').value = '';
+    document.getElementById('secLogUsername').value  = '';
+    document.getElementById('secLogFrom').value       = '';
+    document.getElementById('secLogTo').value         = '';
+    loadSecurityLog(0);
+}
+
+async function loadSecurityLog(page) {
+    const tbody = document.getElementById('secLogBody');
+    if (!tbody) return;
+    if (page < 0) return;
+
+    secLogCurrentPage = page;
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:32px;">Loading...</td></tr>';
+
+    const eventType = document.getElementById('secLogEventType').value;
+    const username  = document.getElementById('secLogUsername').value.trim();
+    const from      = document.getElementById('secLogFrom').value;
+    const to        = document.getElementById('secLogTo').value;
+
+    const params = new URLSearchParams({ page: page, size: 25 });
+    if (eventType) params.set('eventType', eventType);
+    if (username)  params.set('username', username);
+    if (from)      params.set('from', from);
+    if (to)        params.set('to', to);
+
+    try {
+        const res = await fetchWithAuth(`/api/security-events?${params.toString()}`, { headers: authHeaders() });
+        if (!res.ok) throw new Error('Request failed');
+        const data = await res.json();
+
+        secLogTotalPages = data.totalPages || 0;
+
+        if (!data.content || !data.content.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:32px;">No matching events.</td></tr>';
+        } else {
+            tbody.innerHTML = data.content.map(ev => {
+                const meta = SEC_EVENT_LABELS[ev.eventType] || { text: ev.eventType, color: '#5F6368', bg: '#F1F3F4' };
+                return `
+                    <tr>
+                        <td><span style="display:inline-block; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:500; color:${meta.color}; background:${meta.bg};">${meta.text}</span></td>
+                        <td>${escapeHtml(ev.username || '—')}</td>
+                        <td style="font-family:monospace; font-size:12px;">${escapeHtml(ev.ipAddress || '—')}</td>
+                        <td style="font-size:13px; color:var(--g-text-muted);">${escapeHtml(ev.detail || '—')}</td>
+                        <td style="font-size:13px; color:var(--g-text-muted);">${formatHistoryTimestamp(ev.occurredAt)}</td>
+                    </tr>`;
+            }).join('');
+        }
+
+        const pageInfo = document.getElementById('secLogPageInfo');
+        if (pageInfo) {
+            const total = data.totalElements ?? 0;
+            pageInfo.innerText = total ? `Page ${page + 1} of ${secLogTotalPages} — ${total} event(s)` : '';
+        }
+        document.getElementById('secLogPrevBtn').disabled = page <= 0;
+        document.getElementById('secLogNextBtn').disabled = page >= secLogTotalPages - 1;
+    } catch (e) {
+        console.error('Failed to load security log:', e);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--g-red); padding:32px;">Failed to load security events.</td></tr>';
+    }
+}
+
+// --- SLA Config (Tier 3) ---
+async function loadSlaConfig() {
+    try {
+        const res = await fetchWithAuth('/api/sla-config', { headers: authHeaders() });
+        if (!res.ok) throw new Error('Request failed');
+        const config = await res.json();
+
+        document.getElementById('slaHighHours').value   = config.highPriorityHours;
+        document.getElementById('slaMediumHours').value = config.mediumPriorityHours;
+        document.getElementById('slaLowHours').value     = config.lowPriorityHours;
+    } catch (e) {
+        console.error('Failed to load SLA config:', e);
+        showToast('Failed to load SLA settings.', 'error');
+    }
+}
+
+async function saveSlaConfig() {
+    const highHours   = parseInt(document.getElementById('slaHighHours').value, 10);
+    const mediumHours = parseInt(document.getElementById('slaMediumHours').value, 10);
+    const lowHours    = parseInt(document.getElementById('slaLowHours').value, 10);
+
+    const msgBox = document.getElementById('slaConfigMsg');
+
+    if (!highHours || !mediumHours || !lowHours || highHours <= 0 || mediumHours <= 0 || lowHours <= 0) {
+        msgBox.style.display = 'block';
+        msgBox.style.background = '#FCE8E6';
+        msgBox.style.color = '#EA4335';
+        msgBox.innerText = 'All three thresholds must be positive numbers.';
+        return;
+    }
+
+    try {
+        const res = await fetchWithAuth('/api/sla-config', {
+            method: 'PUT',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                highPriorityHours: highHours,
+                mediumPriorityHours: mediumHours,
+                lowPriorityHours: lowHours
+            })
+        });
+
+        msgBox.style.display = 'block';
+        if (res.ok) {
+            msgBox.style.background = '#E6F4EA';
+            msgBox.style.color = '#34A853';
+            msgBox.innerText = 'SLA thresholds updated.';
+            showToast('SLA thresholds saved.', 'success');
+        } else {
+            const errText = await res.text();
+            msgBox.style.background = '#FCE8E6';
+            msgBox.style.color = '#EA4335';
+            msgBox.innerText = errText || 'Failed to save SLA settings.';
+        }
+    } catch (e) {
+        console.error('Failed to save SLA config:', e);
+        msgBox.style.display = 'block';
+        msgBox.style.background = '#FCE8E6';
+        msgBox.style.color = '#EA4335';
+        msgBox.innerText = 'System error. Check console.';
+    }
+}
+
+// --- Categories & Routing Rules (Tier 3) ---
+let cachedCategoriesDetailed = [];
+
+function showMgmtMsg(elId, text, isError) {
+    const box = document.getElementById(elId);
+    if (!box) return;
+    box.style.display = 'block';
+    box.style.background = isError ? '#FCE8E6' : '#E6F4EA';
+    box.style.color = isError ? '#EA4335' : '#34A853';
+    box.innerText = text;
+    setTimeout(() => { box.style.display = 'none'; }, 4000);
+}
+
+async function loadCategoryAndRoutingManagement() {
+    await Promise.all([loadCategoryTree(), loadRoutingRulesTable()]);
+}
+
+async function loadCategoryTree() {
+    const container = document.getElementById('categoryTreeList');
+    if (!container) return;
+    try {
+        const res = await fetchWithAuth('/api/categories/detailed', { headers: authHeaders() });
+        if (!res.ok) throw new Error('Request failed');
+        const categories = await res.json();
+        cachedCategoriesDetailed = categories;
+
+        // Keep the routing rule "Category" dropdown in sync
+        const ruleCategorySelect = document.getElementById('newRuleCategory');
+        if (ruleCategorySelect) {
+            ruleCategorySelect.innerHTML = '<option value="">Any</option>' +
+                categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+        }
+
+        if (!categories.length) {
+            container.innerHTML = '<p style="color:var(--g-text-muted); font-size:13px;">No categories yet.</p>';
+            return;
+        }
+
+        container.innerHTML = categories.map(c => `
+            <div style="border:1px solid var(--g-border); border-radius:10px; padding:12px 14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:600; font-size:13px;">${escapeHtml(c.name)}</span>
+                    <button onclick="deleteCategory(${c.id}, '${escapeHtml(c.name)}')"
+                            style="border:none; background:transparent; cursor:pointer; color:var(--g-text-muted); display:flex;">
+                        <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
+                    </button>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+                    ${c.subCategories.map(sc => `
+                        <span style="display:inline-flex; align-items:center; gap:4px; background:var(--g-background);
+                                     border:1px solid var(--g-border); border-radius:12px; padding:3px 6px 3px 10px; font-size:12px;">
+                            ${escapeHtml(sc.name)}
+                            <span onclick="deleteSubCategory(${sc.id})" style="cursor:pointer; color:var(--g-text-muted); display:flex;">
+                                <span class="material-symbols-rounded" style="font-size:14px;">close</span>
+                            </span>
+                        </span>
+                    `).join('')}
+                </div>
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                    <input type="text" id="newSubCat-${c.id}" placeholder="New sub-category"
+                           onkeydown="if(event.key==='Enter') addSubCategory(${c.id})"
+                           style="flex:1; padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px; font-family:var(--font-ui);">
+                    <button class="g-btn" onclick="addSubCategory(${c.id})" style="padding:6px 12px; font-size:12px;">Add</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load categories:', e);
+        container.innerHTML = '<p style="color:var(--g-red); font-size:13px;">Failed to load categories.</p>';
+    }
+}
+
+async function createCategory() {
+    const input = document.getElementById('newCategoryName');
+    const name = input.value.trim();
+    if (!name) { showMgmtMsg('catMgmtMsg', 'Category name cannot be blank.', true); return; }
+
+    try {
+        const res = await fetchWithAuth('/api/categories', {
+            method: 'POST',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        if (res.ok) {
+            input.value = '';
+            showMgmtMsg('catMgmtMsg', `Category "${name}" created.`, false);
+            loadCategoryTree();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('catMgmtMsg', err || 'Failed to create category.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('catMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+async function deleteCategory(id, name) {
+    if (!confirm(`Delete category "${name}"? This also removes its sub-categories.`)) return;
+    try {
+        const res = await fetchWithAuth(`/api/categories/${id}`, { method: 'DELETE', headers: authHeaders() });
+        if (res.ok) {
+            showMgmtMsg('catMgmtMsg', `Category "${name}" deleted.`, false);
+            loadCategoryTree();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('catMgmtMsg', err || 'Failed to delete category.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('catMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+async function addSubCategory(categoryId) {
+    const input = document.getElementById(`newSubCat-${categoryId}`);
+    const name = input.value.trim();
+    if (!name) return;
+
+    try {
+        const res = await fetchWithAuth(`/api/categories/${categoryId}/subcategories`, {
+            method: 'POST',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        if (res.ok) {
+            loadCategoryTree();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('catMgmtMsg', err || 'Failed to add sub-category.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('catMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+async function deleteSubCategory(id) {
+    if (!confirm('Delete this sub-category?')) return;
+    try {
+        const res = await fetchWithAuth(`/api/categories/subcategories/${id}`, { method: 'DELETE', headers: authHeaders() });
+        if (res.ok) {
+            loadCategoryTree();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('catMgmtMsg', err || 'Failed to delete sub-category.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('catMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+async function loadRoutingRulesTable() {
+    const tbody = document.getElementById('routingRulesBody');
+    if (!tbody) return;
+    try {
+        const res = await fetchWithAuth('/api/routing-rules', { headers: authHeaders() });
+        if (!res.ok) throw new Error('Request failed');
+        const rules = await res.json();
+
+        if (!rules.length) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:24px;">No routing rules yet — new tickets fall back to manual assignment.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = rules.map(r => `
+            <tr>
+                <td>${r.ruleOrder}</td>
+                <td>${r.category ? escapeHtml(r.category.name) : '<span style="color:var(--g-text-muted);">Any</span>'}</td>
+                <td>${r.priority ? escapeHtml(r.priority) : '<span style="color:var(--g-text-muted);">Any</span>'}</td>
+                <td>${escapeHtml(r.targetQueue)}</td>
+                <td>
+                    <button onclick="deleteRoutingRule(${r.id})"
+                            style="border:none; background:transparent; cursor:pointer; color:var(--g-text-muted); display:flex;">
+                        <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load routing rules:', e);
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--g-red); padding:24px;">Failed to load routing rules.</td></tr>';
+    }
+}
+
+async function createRoutingRule() {
+    const ruleOrder = parseInt(document.getElementById('newRuleOrder').value, 10);
+    const categoryId = document.getElementById('newRuleCategory').value;
+    const priority = document.getElementById('newRulePriority').value;
+    const targetQueue = document.getElementById('newRuleQueue').value.trim();
+
+    if (!ruleOrder || ruleOrder < 1) { showMgmtMsg('routingMgmtMsg', 'Order must be a positive number.', true); return; }
+    if (!targetQueue) { showMgmtMsg('routingMgmtMsg', 'Target queue cannot be blank.', true); return; }
+
+    const payload = {
+        ruleOrder,
+        targetQueue,
+        category: categoryId ? { id: parseInt(categoryId, 10) } : null,
+        priority: priority || null
+    };
+
+    try {
+        const res = await fetchWithAuth('/api/routing-rules', {
+            method: 'POST',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+            document.getElementById('newRuleQueue').value = '';
+            showMgmtMsg('routingMgmtMsg', 'Routing rule added.', false);
+            loadRoutingRulesTable();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('routingMgmtMsg', err || 'Failed to add routing rule.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('routingMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+async function deleteRoutingRule(id) {
+    if (!confirm('Delete this routing rule?')) return;
+    try {
+        const res = await fetchWithAuth(`/api/routing-rules/${id}`, { method: 'DELETE', headers: authHeaders() });
+        if (res.ok) {
+            showMgmtMsg('routingMgmtMsg', 'Routing rule deleted.', false);
+            loadRoutingRulesTable();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('routingMgmtMsg', err || 'Failed to delete routing rule.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('routingMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
 async function resetUserPassword(requestId) {
     const input = document.getElementById('newPass-' + requestId);
     const newPassword = input?.value?.trim();
+
     if (!newPassword || newPassword.length < 8) {
         showToast('Password must be at least 8 characters.', 'warning');
         return;

@@ -2,7 +2,7 @@ package com.enterprise.ticketmaster.service;
 
 import com.enterprise.ticketmaster.event.TicketEvent;
 import com.enterprise.ticketmaster.model.NotificationType;
-import com.enterprise.ticketmaster.model.Priority;
+import com.enterprise.ticketmaster.model.SlaConfig;
 import com.enterprise.ticketmaster.model.Status;
 import com.enterprise.ticketmaster.model.Ticket;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,22 +23,20 @@ public class SlaManagementService {
 
     private final TicketRepository ticketRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final SlaConfigService slaConfigService;
 
-    public SlaManagementService(TicketRepository ticketRepository, ApplicationEventPublisher eventPublisher) {
+    public SlaManagementService(TicketRepository ticketRepository, ApplicationEventPublisher eventPublisher,
+                                SlaConfigService slaConfigService) {
         this.ticketRepository = ticketRepository;
         this.eventPublisher = eventPublisher;
+        this.slaConfigService = slaConfigService;
     }
 
     // Assigns the initial deadline based on severity
     public void assignSla(Ticket ticket) {
         LocalDateTime now = LocalDateTime.now();
-        if (ticket.getPriority() == Priority.HIGH) {
-            ticket.setSlaDueDate(now.plusHours(4));   // 4 Hour SLA
-        } else if (ticket.getPriority() == Priority.MEDIUM) {
-            ticket.setSlaDueDate(now.plusHours(24));  // 24 Hour SLA
-        } else {
-            ticket.setSlaDueDate(now.plusHours(72));  // 3 Day SLA
-        }
+        long hours = slaConfigService.getConfig().hoursFor(ticket.getPriority());
+        ticket.setSlaDueDate(now.plusHours(hours));
     }
 
     // The Background Worker: Runs every 60,000 milliseconds (1 minute)
@@ -76,17 +74,14 @@ public class SlaManagementService {
                 .findActiveTicketsWithSla(excludedStatuses);
 
         LocalDateTime now = LocalDateTime.now();
+        SlaConfig config = slaConfigService.getConfig();
 
         for (Ticket ticket : activeTickets) {
             LocalDateTime due = ticket.getSlaDueDate();
             if (due == null) continue;
 
-            // Calculate total SLA duration from priority
-            long totalMinutes = switch (ticket.getPriority()) {
-                case HIGH   -> 4  * 60L;
-                case MEDIUM -> 24 * 60L;
-                case LOW    -> 72 * 60L;
-            };
+            // Total SLA duration from priority, now sourced from the configurable thresholds
+            long totalMinutes = config.hoursFor(ticket.getPriority()) * 60L;
 
             long minutesRemaining = Duration.between(now, due).toMinutes();
             long percentRemaining = (minutesRemaining * 100) / totalMinutes;

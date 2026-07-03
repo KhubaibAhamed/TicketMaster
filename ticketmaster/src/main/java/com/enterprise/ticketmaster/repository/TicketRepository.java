@@ -17,6 +17,10 @@ import java.util.List;
 @Repository
 public interface TicketRepository extends JpaRepository<Ticket, Long> {
 
+    // Guards against deleting a category/sub-category that's still in use on real tickets
+    boolean existsByCategoryId(Long categoryId);
+    boolean existsBySubCategoryId(Long subCategoryId);
+
     @Query("SELECT DISTINCT t FROM Ticket t " +
             "LEFT JOIN FETCH t.category " +
             "LEFT JOIN FETCH t.subCategory " +
