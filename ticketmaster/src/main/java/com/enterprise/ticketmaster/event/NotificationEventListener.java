@@ -45,6 +45,16 @@ public class NotificationEventListener {
                 if (emailService != null && !notifyEmail.isBlank()) {
                     emailService.sendTicketCreated(notifyEmail, ticketId, title);
                 }
+                // Confirmation to the person who raised it — distinct wording/tone from the admin alert above
+                String raisedByUsername = ticket.getRaisedBy();
+                if (emailService != null && raisedByUsername != null && !raisedByUsername.isBlank()) {
+                    userRepository.findByUsername(raisedByUsername).ifPresent(user -> {
+                        String raiserEmail = user.getEmail();
+                        if (raiserEmail != null && !raiserEmail.isBlank()) {
+                            emailService.sendTicketReceived(raiserEmail, ticketId, title);
+                        }
+                    });
+                }
             }
             case SLA_WARNING -> {
                 notification.setMessage("⚠️ SLA warning on ticket #" + ticketId

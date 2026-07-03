@@ -312,7 +312,7 @@ async function loadAgentWorkload() {
 async function loadAgentPerformance() {
     const tbody = document.getElementById('agentPerfBody');
     if (!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--g-text-muted); padding:32px;">Loading...</td></tr>';
+    renderSkeletonRows(tbody, 6, 4, ['70%', '30%', '30%', '40%', '40%', '30%']);
 
     const from = document.getElementById('reportFrom')?.value;
     const to   = document.getElementById('reportTo')?.value;
@@ -386,18 +386,6 @@ function toDateInputValue(date) {
     return `${y}-${m}-${d}`;
 }
 
-let activeRangePreset = 'presetBtnAll'; // tracks which quick-filter button is highlighted
-
-function highlightActiveRangeButton() {
-    ['presetBtn7', 'presetBtn30', 'presetBtnAll'].forEach(id => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        const isActive = id === activeRangePreset;
-        btn.style.background = isActive ? 'var(--g-blue)' : '';
-        btn.style.color = isActive ? '#fff' : '';
-    });
-}
-
 function setReportRangePreset(days) {
     const to = new Date();
     const from = new Date();
@@ -405,14 +393,12 @@ function setReportRangePreset(days) {
 
     document.getElementById('reportFrom').value = toDateInputValue(from);
     document.getElementById('reportTo').value   = toDateInputValue(to);
-    activeRangePreset = days === 7 ? 'presetBtn7' : days === 30 ? 'presetBtn30' : null;
     loadAgentPerformance();
 }
 
 function clearReportRange() {
     document.getElementById('reportFrom').value = '';
     document.getElementById('reportTo').value   = '';
-    activeRangePreset = 'presetBtnAll';
     loadAgentPerformance();
 }
 
@@ -428,7 +414,6 @@ function updateReportRangeLabel(from, to) {
     } else {
         label.innerText = `Showing: through ${to}`;
     }
-    highlightActiveRangeButton();
 }
 
 async function loadVolumeTrend(days) {
@@ -715,6 +700,36 @@ async function refreshDataPipeline() {
         }
     } catch (e) { console.error("Pipeline Sync Error:", e); }
 }
+
+// --- Loading skeletons (Tier 4) ---
+// Renders `rows` skeleton <tr>s into a table body, one shimmer bar per column.
+// widths lets callers vary bar length per column so it doesn't look like a uniform grid.
+function renderSkeletonRows(tbody, colCount, rows = 5, widths = null) {
+    if (!tbody) return;
+    const w = widths || Array(colCount).fill('70%');
+    let html = '';
+    for (let r = 0; r < rows; r++) {
+        html += '<tr class="skel-row">';
+        for (let c = 0; c < colCount; c++) {
+            html += `<td><span class="skel" style="width:${w[c % w.length]}; height:${c === 0 ? '14px' : '11px'};"></span></td>`;
+        }
+        html += '</tr>';
+    }
+    tbody.innerHTML = html;
+}
+
+// Same idea for non-table containers (card lists, detail panels)
+function renderSkeletonBlock(container, lines = 3) {
+    if (!container) return;
+    let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+    for (let i = 0; i < lines; i++) {
+        const width = i === lines - 1 ? '40%' : `${85 - i * 10}%`;
+        html += `<span class="skel" style="width:${width}; height:12px;"></span>`;
+    }
+    html += '</div>';
+    container.innerHTML = html;
+}
+
 function escapeHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str)
@@ -1052,7 +1067,7 @@ async function loadAttachments(ticketId) {
     const attachContainer = document.getElementById('attachmentsList');
     if (!attachContainer) return; // Guard clause if the element doesn't exist
 
-    attachContainer.innerHTML = '<span class="text-sm text-gray-500">Loading...</span>';
+    renderSkeletonBlock(attachContainer, 2);
 
     try {
         const response = await fetchWithAuth(`/api/tickets/${ticketId}/attachments`, { headers: authHeaders() });
@@ -1323,6 +1338,12 @@ function filterTickets() {
 async function loadConsolePage(page, q, status, priority, categoryId) {
     consoleCurrentPage = page;
     consoleSearchQuery = q || '';
+
+    renderSkeletonRows(
+        document.getElementById('ticketTableBody'),
+        9, 8,
+        ['20%', '30%', '80%', '60%', '60%', '70%', '65%', '30%', '40%']
+    );
 
     const currentUser = localStorage.getItem('jwt_username');
     const params = new URLSearchParams({ page, size: 20, sort: consoleSortParam });
@@ -1652,6 +1673,7 @@ function updateRoleSelection() {
 async function loadUserDirectory() {
     const container = document.getElementById('userDirectoryList');
     if (!container) return;
+    renderSkeletonBlock(container, 4);
 
     try {
         const res   = await fetchWithAuth('/api/auth/users', { headers: authHeaders() });
@@ -1752,6 +1774,7 @@ async function deleteUserFromDirectory(userId, username) {
 async function loadPasswordRequests() {
     const container = document.getElementById('passwordRequestsList');
     if (!container) return;
+    renderSkeletonBlock(container, 3);
 
     try {
         const res      = await fetchWithAuth('/api/auth/password-requests', { headers: authHeaders() });
@@ -1860,7 +1883,7 @@ async function loadSecurityLog(page) {
     if (page < 0) return;
 
     secLogCurrentPage = page;
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:32px;">Loading...</td></tr>';
+    renderSkeletonRows(tbody, 5, 6, ['40%', '35%', '55%', '65%', '50%']);
 
     const eventType = document.getElementById('secLogEventType').value;
     const username  = document.getElementById('secLogUsername').value.trim();
@@ -1992,6 +2015,7 @@ async function loadCategoryAndRoutingManagement() {
 async function loadCategoryTree() {
     const container = document.getElementById('categoryTreeList');
     if (!container) return;
+    renderSkeletonBlock(container, 4);
     try {
         const res = await fetchWithAuth('/api/categories/detailed', { headers: authHeaders() });
         if (!res.ok) throw new Error('Request failed');
@@ -2128,6 +2152,7 @@ async function deleteSubCategory(id) {
 async function loadRoutingRulesTable() {
     const tbody = document.getElementById('routingRulesBody');
     if (!tbody) return;
+    renderSkeletonRows(tbody, 5, 3, ['20%', '60%', '50%', '70%', '30%']);
     try {
         const res = await fetchWithAuth('/api/routing-rules', { headers: authHeaders() });
         if (!res.ok) throw new Error('Request failed');
@@ -2296,11 +2321,21 @@ document.getElementById('ticketForm').addEventListener('submit', async (e) => {
 async function startProgress(id) {
     const ticket = currentTickets.find(t => t.id === id);
     if (!ticket) return;
-    await fetchWithAuth(`/api/tickets/${id}`, {
-        method: 'PUT', headers: authHeaders(),
-        // Preserve the original description — never overwrite incident details
-        body: JSON.stringify({ title: ticket.title, description: ticket.description, priority: ticket.priority, status: 'IN_PROGRESS' })
-    });
+    try {
+        const res = await fetchWithAuth(`/api/tickets/${id}`, {
+            method: 'PUT', headers: authHeaders(),
+            // Preserve the original description — never overwrite incident details
+            body: JSON.stringify({ title: ticket.title, description: ticket.description, priority: ticket.priority, status: 'IN_PROGRESS' })
+        });
+        if (res.ok) {
+            showToast(`Ticket #${id} acknowledged — now in progress.`, 'success');
+        } else {
+            showToast(`Failed to acknowledge ticket #${id}.`, 'error');
+        }
+    } catch (e) {
+        console.error('Failed to start progress on ticket:', e);
+        showToast('System error. Check console.', 'error');
+    }
     refreshDataPipeline();
     loadConsolePage(consoleCurrentPage, consoleSearchQuery);
 }
@@ -2439,7 +2474,7 @@ function switchDetailTab(tab) {
 
 async function loadTicketHistory(ticketId) {
     const historyList = document.getElementById('historyList');
-    historyList.innerHTML = '<p style="color: var(--g-text-muted); font-size: 13px;">Loading...</p>';
+    renderSkeletonBlock(historyList, 3);
 
     try {
         const res = await fetchWithAuth(`/api/tickets/${ticketId}/history`, {

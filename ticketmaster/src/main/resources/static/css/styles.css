@@ -197,3 +197,27 @@ body[data-theme="dark"] .g-input-group textarea:not(:placeholder-shown) ~ label 
 body[data-theme="dark"] .chart-tab:hover:not(.active) { background: #3A3A3C; }
 body[data-theme="dark"] #F8F9FA,
 body[data-theme="dark"] .data-table th { background-color: #2C2C2E; }
+/* ===== LOADING SKELETONS ===== */
+@keyframes skeleton-shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.skel {
+    display: inline-block;
+    height: 12px;
+    border-radius: 6px;
+    background: linear-gradient(90deg, var(--g-border) 25%, var(--g-background) 50%, var(--g-border) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    vertical-align: middle;
+}
+
+.skel-circle {
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.skel-row td {
+    padding: 14px 16px;
+}

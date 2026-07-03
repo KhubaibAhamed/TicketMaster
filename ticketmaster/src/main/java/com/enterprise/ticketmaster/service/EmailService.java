@@ -28,6 +28,27 @@ public class EmailService {
     }
 
     @Async
+    public void sendTicketReceived(String toEmail, Long ticketId, String title) {
+        String subject = "We've received your request — Ticket #" + ticketId;
+        String body = """
+                <div style="font-family: Inter, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: #1A73E8; padding: 24px 32px;">
+                        <h1 style="color: white; margin: 0; font-size: 20px;">Ticketmaster Enterprise</h1>
+                    </div>
+                    <div style="padding: 32px; border: 1px solid #E0E0E0; border-top: none;">
+                        <h2 style="color: #202124; margin: 0 0 16px 0;">Your Request Has Been Received</h2>
+                        <p style="color: #5F6368;">Thanks for reaching out. Ticket <strong>#%d</strong> has been logged and a member of our team will be with you shortly.</p>
+                        <div style="background: #F8F9FA; padding: 16px; border-radius: 8px; margin: 24px 0;">
+                            <p style="margin: 0; font-weight: 600; color: #202124;">%s</p>
+                        </div>
+                        <p style="color: #5F6368;">You can check on the status of your request at any time by logging in to the portal.</p>
+                    </div>
+                </div>
+                """.formatted(ticketId, title);
+        send(toEmail, subject, body);
+    }
+
+    @Async
     public void sendTicketCreated(String toEmail, Long ticketId, String title) {
         String subject = "New Ticket #" + ticketId + " Raised: " + title;
         String body = """
