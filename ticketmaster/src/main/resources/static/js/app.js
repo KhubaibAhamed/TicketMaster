@@ -992,6 +992,7 @@ async function openTicketDetail(id) {
 
         renderStatusStepper(ticket);
         renderComments(ticket.comments || []);
+        loadCannedResponsesForPicker();
         loadAttachments(ticket.id);
         loadLinkedTickets(ticket.id);
         populateAssignedAgentDropdown(ticket.assignedAgent);
@@ -1643,7 +1644,7 @@ async function adminRegisterUser() {
 }
 
 function switchSettingsTab(tabId) {
-    ['tabUsers', 'tabRegister', 'tabRequests', 'tabSecurity', 'tabSla', 'tabRouting'].forEach(id => {
+    ['tabUsers', 'tabRegister', 'tabRequests', 'tabSecurity', 'tabSla', 'tabRouting', 'tabCanned'].forEach(id => {
         const panel = document.getElementById('settingsPanel-' + id);
         const btn   = document.getElementById('settingsTab-' + id);
         if (!panel || !btn) return;
@@ -1658,6 +1659,7 @@ function switchSettingsTab(tabId) {
     if (tabId === 'tabSecurity') loadSecurityLog(0);
     if (tabId === 'tabSla')      loadSlaConfig();
     if (tabId === 'tabRouting')  loadCategoryAndRoutingManagement();
+    if (tabId === 'tabCanned')   loadCannedResponseManagement();
 }
 
 function updateRoleSelection() {
@@ -2229,6 +2231,116 @@ async function deleteSubCategory(id) {
         console.error(e);
         showMgmtMsg('catMgmtMsg', 'System error. Check console.', true);
     }
+}
+
+// --- Canned Responses (Phase B) ---
+let cachedCannedResponses = [];
+
+async function loadCannedResponseManagement() {
+    const container = document.getElementById('cannedResponseList');
+    if (!container) return;
+    renderSkeletonBlock(container, 3);
+    try {
+        const res = await fetchWithAuth('/api/canned-responses', { headers: authHeaders() });
+        if (!res.ok) throw new Error('Request failed');
+        const responses = await res.json();
+        cachedCannedResponses = responses;
+
+        if (!responses.length) {
+            container.innerHTML = '<p style="color:var(--g-text-muted); font-size:13px;">No canned responses yet.</p>';
+            return;
+        }
+
+        container.innerHTML = responses.map(r => `
+            <div style="border:1px solid var(--g-border); border-radius:10px; padding:12px 14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:600; font-size:13px;">${escapeHtml(r.title)}</span>
+                    <button onclick="deleteCannedResponse(${r.id}, '${escapeHtml(r.title)}')"
+                            style="border:none; background:transparent; cursor:pointer; color:var(--g-text-muted); display:flex;">
+                        <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
+                    </button>
+                </div>
+                <p style="margin:6px 0 0 0; font-size:12px; color:var(--g-text-muted); white-space:pre-wrap; max-height:60px; overflow:hidden;">${escapeHtml(r.body)}</p>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load canned responses:', e);
+        container.innerHTML = '<p style="color:var(--g-red); font-size:13px;">Failed to load canned responses.</p>';
+    }
+}
+
+async function createCannedResponse() {
+    const title = document.getElementById('newCannedTitle').value.trim();
+    const body = document.getElementById('newCannedBody').value.trim();
+    if (!title || !body) { showMgmtMsg('cannedMgmtMsg', 'Title and body are both required.', true); return; }
+
+    try {
+        const res = await fetchWithAuth('/api/canned-responses', {
+            method: 'POST',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, body })
+        });
+        if (res.ok) {
+            document.getElementById('newCannedTitle').value = '';
+            document.getElementById('newCannedBody').value = '';
+            showMgmtMsg('cannedMgmtMsg', 'Canned response created.', false);
+            loadCannedResponseManagement();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('cannedMgmtMsg', err || 'Failed to create canned response.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('cannedMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+async function deleteCannedResponse(id, title) {
+    if (!confirm(`Delete canned response "${title}"?`)) return;
+    try {
+        const res = await fetchWithAuth(`/api/canned-responses/${id}`, { method: 'DELETE', headers: authHeaders() });
+        if (res.ok) {
+            showMgmtMsg('cannedMgmtMsg', `"${title}" deleted.`, false);
+            loadCannedResponseManagement();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('cannedMgmtMsg', err || 'Failed to delete.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('cannedMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+// --- Insert-into-comment-box picker (used inside the ticket detail modal) ---
+let cachedCannedResponsesForPicker = [];
+
+async function loadCannedResponsesForPicker() {
+    try {
+        const res = await fetchWithAuth('/api/canned-responses', { headers: authHeaders() });
+        cachedCannedResponsesForPicker = res.ok ? await res.json() : [];
+    } catch (e) {
+        console.error('Failed to load canned responses for picker:', e);
+        cachedCannedResponsesForPicker = [];
+    }
+    const select = document.getElementById('cannedResponsePicker');
+    if (!select) return;
+    select.innerHTML = '<option value="">Insert canned response…</option>' +
+        cachedCannedResponsesForPicker.map(r => `<option value="${r.id}">${escapeHtml(r.title)}</option>`).join('');
+}
+
+function insertCannedResponse() {
+    const select = document.getElementById('cannedResponsePicker');
+    const id = parseInt(select.value, 10);
+    if (!id) return;
+    const chosen = cachedCannedResponsesForPicker.find(r => r.id === id);
+    if (!chosen) return;
+
+    const textarea = document.getElementById('newCommentContent');
+    const existing = textarea.value;
+    textarea.value = existing ? existing + '\n\n' + chosen.body : chosen.body;
+    select.value = ''; // reset picker so it can be re-selected later
+    textarea.focus();
 }
 
 async function loadRoutingRulesTable() {

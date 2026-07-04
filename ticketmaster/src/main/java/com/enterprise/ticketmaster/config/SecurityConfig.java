@@ -65,6 +65,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/sla-config").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/sla-config").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/tickets/suggest").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/canned-responses").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/canned-responses").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/canned-responses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/canned-responses/**").hasRole("ADMIN")
 
                         // 4. AUTHENTICATED WORKFLOW APIs (Both Admins and Developers)
                         .requestMatchers("/api/tickets/**").authenticated()
