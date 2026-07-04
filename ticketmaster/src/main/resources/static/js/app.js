@@ -2181,6 +2181,11 @@ async function loadCategoryTree() {
     }
 }
 
+function toggleNewRuleAgentsField() {
+    const enabled = document.getElementById('newRuleAutoAssign').checked;
+    document.getElementById('newRuleAgentsWrapper').style.display = enabled ? 'block' : 'none';
+}
+
 async function saveCategoryEscalation(categoryId) {
     const contact = document.getElementById(`escContact-${categoryId}`).value.trim();
     const autoBump = document.getElementById(`escBump-${categoryId}`).checked;
@@ -2405,7 +2410,7 @@ async function loadRoutingRulesTable() {
         const rules = await res.json();
 
         if (!rules.length) {
-            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:24px;">No routing rules yet — new tickets fall back to manual assignment.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--g-text-muted); padding:24px;">No routing rules yet — new tickets fall back to manual assignment.</td></tr>';
             return;
         }
 
@@ -2415,6 +2420,9 @@ async function loadRoutingRulesTable() {
                 <td>${r.category ? escapeHtml(r.category.name) : '<span style="color:var(--g-text-muted);">Any</span>'}</td>
                 <td>${r.priority ? escapeHtml(r.priority) : '<span style="color:var(--g-text-muted);">Any</span>'}</td>
                 <td>${escapeHtml(r.targetQueue)}</td>
+                <td>${r.autoAssignEnabled
+                    ? `<span style="font-size:12px;">${escapeHtml(r.eligibleAgents || '')}</span>`
+                    : '<span style="color:var(--g-text-muted); font-size:12px;">Off</span>'}</td>
                 <td>
                     <button onclick="deleteRoutingRule(${r.id})"
                             style="border:none; background:transparent; cursor:pointer; color:var(--g-text-muted); display:flex;">
@@ -2425,7 +2433,7 @@ async function loadRoutingRulesTable() {
         `).join('');
     } catch (e) {
         console.error('Failed to load routing rules:', e);
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--g-red); padding:24px;">Failed to load routing rules.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--g-red); padding:24px;">Failed to load routing rules.</td></tr>';
     }
 }
 
@@ -2434,15 +2442,20 @@ async function createRoutingRule() {
     const categoryId = document.getElementById('newRuleCategory').value;
     const priority = document.getElementById('newRulePriority').value;
     const targetQueue = document.getElementById('newRuleQueue').value.trim();
+    const autoAssignEnabled = document.getElementById('newRuleAutoAssign').checked;
+    const eligibleAgents = document.getElementById('newRuleAgents').value.trim();
 
     if (!ruleOrder || ruleOrder < 1) { showMgmtMsg('routingMgmtMsg', 'Order must be a positive number.', true); return; }
     if (!targetQueue) { showMgmtMsg('routingMgmtMsg', 'Target queue cannot be blank.', true); return; }
+    if (autoAssignEnabled && !eligibleAgents) { showMgmtMsg('routingMgmtMsg', 'List at least one eligible agent, or turn off auto-assign.', true); return; }
 
     const payload = {
         ruleOrder,
         targetQueue,
         category: categoryId ? { id: parseInt(categoryId, 10) } : null,
-        priority: priority || null
+        priority: priority || null,
+        autoAssignEnabled,
+        eligibleAgents: autoAssignEnabled ? eligibleAgents : null
     };
 
     try {
@@ -2453,6 +2466,9 @@ async function createRoutingRule() {
         });
         if (res.ok) {
             document.getElementById('newRuleQueue').value = '';
+            document.getElementById('newRuleAgents').value = '';
+            document.getElementById('newRuleAutoAssign').checked = false;
+            toggleNewRuleAgentsField();
             showMgmtMsg('routingMgmtMsg', 'Routing rule added.', false);
             loadRoutingRulesTable();
         } else {

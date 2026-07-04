@@ -23,6 +23,13 @@ public class RoutingRule {
     @Column(nullable = false)
     private String targetQueue; // The team or queue the ticket should be sent to
 
+    @Column(name = "auto_assign_enabled", nullable = false)
+    private boolean autoAssignEnabled = false;
+
+    // CSV of usernames eligible for auto-assignment under this rule, e.g. "jane,bob,amit"
+    @Column(name = "eligible_agents", length = 500)
+    private String eligibleAgents;
+
     public RoutingRule() {}
 
     public Long getId() { return id; }
@@ -35,4 +42,19 @@ public class RoutingRule {
     public void setPriority(Priority priority) { this.priority = priority; }
     public String getTargetQueue() { return targetQueue; }
     public void setTargetQueue(String targetQueue) { this.targetQueue = targetQueue; }
+
+    public boolean isAutoAssignEnabled() { return autoAssignEnabled; }
+    public void setAutoAssignEnabled(boolean autoAssignEnabled) { this.autoAssignEnabled = autoAssignEnabled; }
+
+    public String getEligibleAgents() { return eligibleAgents; }
+    public void setEligibleAgents(String eligibleAgents) { this.eligibleAgents = eligibleAgents; }
+
+    /** Parses the eligibleAgents CSV into a clean list of usernames. */
+    public java.util.List<String> getEligibleAgentList() {
+        if (eligibleAgents == null || eligibleAgents.isBlank()) return java.util.List.of();
+        return java.util.Arrays.stream(eligibleAgents.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
+    }
 }

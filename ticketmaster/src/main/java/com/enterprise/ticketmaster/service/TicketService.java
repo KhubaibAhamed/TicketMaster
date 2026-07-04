@@ -42,8 +42,6 @@ public class TicketService {
     }
 
     public Ticket createTicket(Ticket ticket) {
-        // Resolve category from DB using the id the frontend sent
-        // Without this, Hibernate sees a detached Category object and crashes
         if (ticket.getCategory() != null && ticket.getCategory().getId() != null) {
             Category category = categoryRepository.findById(ticket.getCategory().getId())
                     .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + ticket.getCategory().getId()));
@@ -55,6 +53,10 @@ public class TicketService {
         ticket.setStatus(Status.OPEN);
         Ticket saved = ticketRepository.save(ticket);
         eventPublisher.publishEvent(new TicketEvent(saved, NotificationType.TICKET_CREATED));
+
+        if (saved.getAssignedAgent() != null && !saved.getAssignedAgent().isBlank()) {
+            eventPublisher.publishEvent(new TicketEvent(saved, NotificationType.TICKET_ASSIGNED));
+        }
         return saved;
     }
 

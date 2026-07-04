@@ -1076,7 +1076,7 @@
                             <div id="routingMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:13px; font-weight:500;"></div>
 
                             <!-- Add rule form -->
-                            <div style="display:grid; grid-template-columns: 60px 1fr 1fr 1fr auto; gap:8px; margin-bottom:18px; align-items:end;">
+                            <div style="display:grid; grid-template-columns: 60px 1fr 1fr 1fr auto; gap:8px; margin-bottom:10px; align-items:end;">
                                 <div>
                                     <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Order</label>
                                     <input type="number" id="newRuleOrder" min="1" step="1" value="1"
@@ -1105,6 +1105,18 @@
                                 <button class="g-btn g-btn-primary" onclick="createRoutingRule()" style="padding:8px 16px; font-size:13px;">Add</button>
                             </div>
 
+                            <div style="display:grid; grid-template-columns: 1fr 2fr; gap:8px; margin-bottom:18px; align-items:end;">
+                                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; padding-bottom:8px;">
+                                    <input type="checkbox" id="newRuleAutoAssign" onchange="toggleNewRuleAgentsField()">
+                                    Auto-assign least-loaded agent
+                                </label>
+                                <div id="newRuleAgentsWrapper" style="display:none;">
+                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Eligible agents (comma-separated usernames)</label>
+                                    <input type="text" id="newRuleAgents" placeholder="e.g. jane, bob, amit"
+                                           style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
+                                </div>
+                            </div>
+
                             <div style="background:var(--g-background); border:1px solid var(--g-border); border-radius:12px; overflow:hidden;">
                                 <table class="data-table">
                                     <thead>
@@ -1113,6 +1125,7 @@
                                         <th>Category</th>
                                         <th>Priority</th>
                                         <th>Target Queue</th>
+                                        <th>Auto-Assign Pool</th>
                                         <th style="width:60px;"></th>
                                     </tr>
                                     </thead>
