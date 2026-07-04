@@ -29,10 +29,12 @@ public class ReportController {
         List<Object[]> resolutionRows    = ticketRepository.findAvgResolutionPerAgent();
         List<Object[]> firstResponseRows = commentRepository.findFirstResponsePerTicket();
 
+        // Null, not 0.0, means "no data yet" — 0.0 is reserved for a genuine near-instant average.
         Map<String, Double> resolutionMap = new HashMap<>();
         for (Object[] row : resolutionRows) {
-            String agent      = (String) row[0];
-            double avgMinutes = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+            String agent = (String) row[0];
+            if (row[1] == null) continue; // SQL AVG() over zero rows is NULL — skip, don't coerce to 0.0
+            double avgMinutes = ((Number) row[1]).doubleValue();
             resolutionMap.put(agent, avgMinutes / 60.0);
         }
 
@@ -58,15 +60,17 @@ public class ReportController {
             long totalResolved = ((Number) row[2]).longValue();
             long slaCompliant  = ((Number) row[3]).longValue();
 
-            double slaRate          = totalAssigned > 0 ? (slaCompliant * 100.0) / totalAssigned : 0.0;
-            double avgResolution    = resolutionMap.getOrDefault(agent, 0.0);
-            double avgFirstResponse = firstResponseMap.getOrDefault(agent, 0.0);
+            double slaRate = totalAssigned > 0 ? (slaCompliant * 100.0) / totalAssigned : 0.0;
+
+            Double avgResolution = resolutionMap.containsKey(agent)
+                    ? Math.round(resolutionMap.get(agent) * 10.0) / 10.0 : null;
+            Double avgFirstResponse = firstResponseMap.containsKey(agent)
+                    ? Math.round(firstResponseMap.get(agent) * 10.0) / 10.0 : null;
 
             result.add(new AgentPerformanceDto(
                     agent, totalAssigned, totalResolved,
-                    Math.round(avgResolution    * 10.0) / 10.0,
-                    Math.round(avgFirstResponse * 10.0) / 10.0,
-                    Math.round(slaRate          * 10.0) / 10.0
+                    avgResolution, avgFirstResponse,
+                    Math.round(slaRate * 10.0) / 10.0
             ));
         }
 

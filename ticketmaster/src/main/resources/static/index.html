@@ -1000,6 +1000,34 @@
                             </div>
                         </div>
 
+                        <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--g-border);">
+                            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; font-weight:500;">
+                                <input type="checkbox" id="slaBusinessHoursEnabled" onchange="toggleSlaBusinessHoursFields()">
+                                Only count business hours toward SLA deadlines
+                            </label>
+                            <p style="margin:4px 0 16px 26px; font-size:12px; color:var(--g-text-muted);">
+                                When on, SLA clocks pause outside the hours/days below (e.g. a Friday-evening ticket won't breach over the weekend).
+                            </p>
+
+                            <div id="slaBusinessHoursFields" style="display:none; padding-left:26px; display:flex; flex-direction:column; gap:14px;">
+                                <div style="display:flex; align-items:center; gap:12px;">
+                                    <label style="font-size:13px; width:110px;">Work hours</label>
+                                    <input type="number" id="slaWorkStartHour" min="0" max="23" step="1"
+                                           style="width:70px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                    <span style="font-size:13px; color:var(--g-text-muted);">to</span>
+                                    <input type="number" id="slaWorkEndHour" min="0" max="23" step="1"
+                                           style="width:70px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                    <span style="font-size:13px; color:var(--g-text-muted);">(24h, e.g. 9 to 18)</span>
+                                </div>
+                                <div style="display:flex; align-items:flex-start; gap:12px;">
+                                    <label style="font-size:13px; width:110px; padding-top:4px;">Work days</label>
+                                    <div id="slaWorkDaysGroup" style="display:flex; flex-wrap:wrap; gap:8px;">
+                                        <!-- populated by JS -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <button class="g-btn g-btn-primary" onclick="saveSlaConfig()"
                                 style="margin-top:24px; padding:10px 24px; font-size:13px;">
                             Save Changes

@@ -21,15 +21,18 @@ public class CategoryController {
     private final SubCategoryRepository subCategoryRepository;
     private final TicketRepository ticketRepository;
     private final RoutingRuleRepository routingRuleRepository;
+    private final com.enterprise.ticketmaster.repository.UserRepository userRepository;
 
     public CategoryController(CategoryRepository categoryRepository,
                               SubCategoryRepository subCategoryRepository,
                               TicketRepository ticketRepository,
-                              RoutingRuleRepository routingRuleRepository) {
+                              RoutingRuleRepository routingRuleRepository,
+                              com.enterprise.ticketmaster.repository.UserRepository userRepository) {
         this.categoryRepository = categoryRepository;
         this.subCategoryRepository = subCategoryRepository;
         this.ticketRepository = ticketRepository;
         this.routingRuleRepository = routingRuleRepository;
+        this.userRepository = userRepository;
     }
 
     // Lightweight shape for the dropdown — keeps the lazy subCategories list out of the response
@@ -58,12 +61,16 @@ public class CategoryController {
         public Long id;
         public String name;
         public String description;
+        public String escalationContactUsername;
+        public boolean autoBumpPriorityOnBreach;
         public List<SubCategoryResponse> subCategories;
 
         public CategoryDetailResponse(Category c, List<SubCategoryResponse> subs) {
             this.id = c.getId();
             this.name = c.getName();
             this.description = c.getDescription();
+            this.escalationContactUsername = c.getEscalationContactUsername();
+            this.autoBumpPriorityOnBreach = c.isAutoBumpPriorityOnBreach();
             this.subCategories = subs;
         }
     }
@@ -101,6 +108,31 @@ public class CategoryController {
         category.setId(null); // never trust a client-supplied id — this is always a new row
         Category saved = categoryRepository.save(category);
         return ResponseEntity.status(HttpStatus.CREATED).body(new CategoryResponse(saved.getId(), saved.getName()));
+    }
+
+    public record CategoryUpdateRequest(String escalationContactUsername, Boolean autoBumpPriorityOnBreach) {}
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateCategory(@PathVariable Long id, @RequestBody CategoryUpdateRequest request) {
+        Category category = categoryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+
+        if (request.escalationContactUsername() != null) {
+            String contact = request.escalationContactUsername().trim();
+            if (!contact.isEmpty() && !userRepository.existsByUsername(contact)) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No user found with username: " + contact);
+            }
+            category.setEscalationContactUsername(contact.isEmpty() ? null : contact);
+        }
+        if (request.autoBumpPriorityOnBreach() != null) {
+            category.setAutoBumpPriorityOnBreach(request.autoBumpPriorityOnBreach());
+        }
+
+        Category saved = categoryRepository.save(category);
+        List<SubCategoryResponse> subs = subCategoryRepository.findByCategoryId(saved.getId()).stream()
+                .map(sc -> new SubCategoryResponse(sc.getId(), sc.getName()))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(new CategoryDetailResponse(saved, subs));
     }
 
     @DeleteMapping("/{id}")

@@ -121,6 +121,22 @@ public class NotificationEventListener {
                 notification.setMessage("Ticket #" + ticketId + " was automatically closed after 3 days in Resolved status.");
                 notification.setRecipientUsername(ticket.getRaisedBy());
             }
+            case ESCALATION_TRIGGERED -> {
+                notification.setMessage("🚨 Ticket #" + ticketId + " escalated after SLA breach — priority now "
+                        + ticket.getPriority() + ": " + title);
+                String contact = event.getEscalationContact();
+                if (contact != null && !contact.isBlank()) {
+                    notification.setRecipientUsername(contact);
+                    userRepository.findByUsername(contact).ifPresent(user -> {
+                        String contactEmail = user.getEmail();
+                        if (emailService != null && contactEmail != null && !contactEmail.isBlank()) {
+                            emailService.sendEscalation(contactEmail, ticketId, title, ticket.getPriority().toString());
+                        }
+                    });
+                } else {
+                    notification.setRecipientRole("ADMIN");
+                }
+            }
         }
 
         notificationRepository.save(notification);

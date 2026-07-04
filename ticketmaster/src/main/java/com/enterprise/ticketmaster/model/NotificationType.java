@@ -8,5 +8,6 @@ public enum NotificationType {
     TICKET_AUTO_CLOSED,
     SLA_WARNING,
     SLA_CRITICAL,
-    SLA_BREACHED
+    SLA_BREACHED,
+    ESCALATION_TRIGGERED
 }

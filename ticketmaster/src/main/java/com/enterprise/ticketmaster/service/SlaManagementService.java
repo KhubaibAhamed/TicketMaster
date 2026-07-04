@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.time.LocalDateTime;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 
@@ -24,22 +23,28 @@ public class SlaManagementService {
     private final TicketRepository ticketRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final SlaConfigService slaConfigService;
+    private final BusinessHoursCalculator businessHoursCalculator;
+    private final EscalationService escalationService;
 
     public SlaManagementService(TicketRepository ticketRepository, ApplicationEventPublisher eventPublisher,
-                                SlaConfigService slaConfigService) {
+                                SlaConfigService slaConfigService, BusinessHoursCalculator businessHoursCalculator,
+                                EscalationService escalationService) {
         this.ticketRepository = ticketRepository;
         this.eventPublisher = eventPublisher;
         this.slaConfigService = slaConfigService;
+        this.businessHoursCalculator = businessHoursCalculator;
+        this.escalationService = escalationService;
     }
 
-    // Assigns the initial deadline based on severity
+    // Assigns the initial deadline based on severity, honoring the business-hours calendar if enabled
     public void assignSla(Ticket ticket) {
         LocalDateTime now = LocalDateTime.now();
-        long hours = slaConfigService.getConfig().hoursFor(ticket.getPriority());
-        ticket.setSlaDueDate(now.plusHours(hours));
+        SlaConfig config = slaConfigService.getConfig();
+        long hours = config.hoursFor(ticket.getPriority());
+        ticket.setSlaDueDate(businessHoursCalculator.addBusinessHours(now, hours, config));
     }
 
-    // The Background Worker: Runs every 60,000 milliseconds (1 minute)
+    // The Background Worker: Runs every hour on the hour
     @Scheduled(cron = "0 0 * * * *")
     public void monitorSlaBreaches() {
         // We do NOT penalize agents if the ticket is waiting on the customer (PENDING)
@@ -58,6 +63,7 @@ public class SlaManagementService {
             ticketRepository.saveAll(breachedTickets);
             for (Ticket ticket : breachedTickets) {
                 eventPublisher.publishEvent(new TicketEvent(ticket, NotificationType.SLA_BREACHED));
+                escalationService.escalate(ticket);
             }
         }
     }
@@ -78,10 +84,12 @@ public class SlaManagementService {
             LocalDateTime due = ticket.getSlaDueDate();
             if (due == null) continue;
 
-            // Total SLA duration from priority, now sourced from the configurable thresholds
+            // Total SLA duration from priority, in business minutes (already the "budget" used when the due date was set)
             long totalMinutes = config.hoursFor(ticket.getPriority()) * 60L;
 
-            long minutesRemaining = Duration.between(now, due).toMinutes();
+            // Business-hours-aware elapsed/remaining calc — falls back to plain calendar time when disabled
+            long minutesUsed = businessHoursCalculator.businessMinutesBetween(ticket.getCreatedAt(), now, config);
+            long minutesRemaining = totalMinutes - minutesUsed;
             long percentRemaining = (minutesRemaining * 100) / totalMinutes;
 
             // CRITICAL — 10% or less remaining, not yet sent

@@ -190,4 +190,25 @@ public class EmailService {
             log.error("Failed to send email to {}: {}", to, e.getMessage());
         }
     }
+
+    @Async
+    public void sendEscalation(String toEmail, Long ticketId, String title, String newPriority) {
+        String subject = "🚨 Escalated — Ticket #" + ticketId + " breached SLA";
+        String body = """
+            <div style="font-family: Inter, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #D93025; padding: 24px 32px;">
+                    <h1 style="color: white; margin: 0; font-size: 20px;">Ticketmaster Enterprise</h1>
+                </div>
+                <div style="padding: 32px; border: 1px solid #E0E0E0; border-top: none;">
+                    <h2 style="color: #D93025; margin: 0 0 16px 0;">Ticket Escalated To You</h2>
+                    <p style="color: #5F6368;">Ticket <strong>#%d</strong> breached its SLA and has been escalated to you. Priority is now <strong>%s</strong>.</p>
+                    <div style="background: #FCE8E6; padding: 16px; border-radius: 8px; margin: 24px 0; border-left: 4px solid #D93025;">
+                        <p style="margin: 0; font-weight: 600; color: #D93025;">%s</p>
+                    </div>
+                    <p style="color: #5F6368;">Please review this ticket as soon as possible.</p>
+                </div>
+            </div>
+            """.formatted(ticketId, newPriority, title);
+        send(toEmail, subject, body);
+    }
 }

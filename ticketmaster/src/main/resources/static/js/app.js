@@ -361,10 +361,10 @@ async function loadAgentPerformance() {
                         <span style="font-size:11px; color:var(--g-text-muted);"> (${resolutionRate}%)</span>
                     </td>
                     <td style="text-align:center; color:var(--g-text-main);">
-                        ${a.avgResolutionHours > 0 ? a.avgResolutionHours + 'h' : '—'}
+                        ${a.avgResolutionHours != null ? a.avgResolutionHours + 'h' : '—'}
                     </td>
                     <td style="text-align:center; color:var(--g-text-main);">
-                        ${a.avgFirstResponseHours > 0 ? a.avgFirstResponseHours + 'h' : '—'}
+                        ${a.avgFirstResponseHours != null ? a.avgFirstResponseHours + 'h' : '—'}
                     </td>
                     <td style="text-align:center;">
                         <span style="font-weight:600; color:${slaColor};">${a.slaComplianceRate}%</span>
@@ -1933,6 +1933,30 @@ async function loadSecurityLog(page) {
 }
 
 // --- SLA Config (Tier 3) ---
+const SLA_WORK_DAYS = ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
+const SLA_WORK_DAY_LABELS = { MONDAY:'Mon', TUESDAY:'Tue', WEDNESDAY:'Wed', THURSDAY:'Thu', FRIDAY:'Fri', SATURDAY:'Sat', SUNDAY:'Sun' };
+
+function renderSlaWorkDayChips(selectedDays) {
+    const group = document.getElementById('slaWorkDaysGroup');
+    if (!group) return;
+    group.innerHTML = SLA_WORK_DAYS.map(day => {
+        const checked = selectedDays.includes(day) ? 'checked' : '';
+        return `<label style="display:flex; align-items:center; gap:5px; font-size:12px; padding:6px 10px;
+                        border:1px solid var(--g-border); border-radius:8px; cursor:pointer;">
+                    <input type="checkbox" class="sla-work-day" value="${day}" ${checked}> ${SLA_WORK_DAY_LABELS[day]}
+                </label>`;
+    }).join('');
+}
+
+function getSelectedSlaWorkDays() {
+    return Array.from(document.querySelectorAll('.sla-work-day:checked')).map(cb => cb.value);
+}
+
+function toggleSlaBusinessHoursFields() {
+    const enabled = document.getElementById('slaBusinessHoursEnabled').checked;
+    document.getElementById('slaBusinessHoursFields').style.display = enabled ? 'flex' : 'none';
+}
+
 async function loadSlaConfig() {
     try {
         const res = await fetchWithAuth('/api/sla-config', { headers: authHeaders() });
@@ -1942,6 +1966,12 @@ async function loadSlaConfig() {
         document.getElementById('slaHighHours').value   = config.highPriorityHours;
         document.getElementById('slaMediumHours').value = config.mediumPriorityHours;
         document.getElementById('slaLowHours').value     = config.lowPriorityHours;
+
+        document.getElementById('slaBusinessHoursEnabled').checked = !!config.businessHoursEnabled;
+        document.getElementById('slaWorkStartHour').value = config.workStartHour;
+        document.getElementById('slaWorkEndHour').value   = config.workEndHour;
+        renderSlaWorkDayChips((config.workDays || '').split(',').map(d => d.trim()).filter(Boolean));
+        toggleSlaBusinessHoursFields();
     } catch (e) {
         console.error('Failed to load SLA config:', e);
         showToast('Failed to load SLA settings.', 'error');
@@ -1953,6 +1983,11 @@ async function saveSlaConfig() {
     const mediumHours = parseInt(document.getElementById('slaMediumHours').value, 10);
     const lowHours    = parseInt(document.getElementById('slaLowHours').value, 10);
 
+    const businessHoursEnabled = document.getElementById('slaBusinessHoursEnabled').checked;
+    const workStartHour = parseInt(document.getElementById('slaWorkStartHour').value, 10);
+    const workEndHour   = parseInt(document.getElementById('slaWorkEndHour').value, 10);
+    const workDays      = getSelectedSlaWorkDays().join(',');
+
     const msgBox = document.getElementById('slaConfigMsg');
 
     if (!highHours || !mediumHours || !lowHours || highHours <= 0 || mediumHours <= 0 || lowHours <= 0) {
@@ -1960,6 +1995,13 @@ async function saveSlaConfig() {
         msgBox.style.background = '#FCE8E6';
         msgBox.style.color = '#EA4335';
         msgBox.innerText = 'All three thresholds must be positive numbers.';
+        return;
+    }
+    if (businessHoursEnabled && (!workDays || workStartHour >= workEndHour)) {
+        msgBox.style.display = 'block';
+        msgBox.style.background = '#FCE8E6';
+        msgBox.style.color = '#EA4335';
+        msgBox.innerText = 'Pick at least one work day and a valid start/end hour range.';
         return;
     }
 
@@ -1970,7 +2012,11 @@ async function saveSlaConfig() {
             body: JSON.stringify({
                 highPriorityHours: highHours,
                 mediumPriorityHours: mediumHours,
-                lowPriorityHours: lowHours
+                lowPriorityHours: lowHours,
+                businessHoursEnabled,
+                workStartHour,
+                workEndHour,
+                workDays
             })
         });
 
@@ -2060,11 +2106,47 @@ async function loadCategoryTree() {
                            style="flex:1; padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px; font-family:var(--font-ui);">
                     <button class="g-btn" onclick="addSubCategory(${c.id})" style="padding:6px 12px; font-size:12px;">Add</button>
                 </div>
+                <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--g-border); display:flex; flex-direction:column; gap:6px;">
+                    <label style="font-size:11px; color:var(--g-text-muted);">Escalation contact (username, blank = admins)</label>
+                    <input type="text" id="escContact-${c.id}" value="${escapeHtml(c.escalationContactUsername || '')}"
+                           placeholder="e.g. agent_jane"
+                           style="padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px; font-family:var(--font-ui);">
+                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+                        <input type="checkbox" id="escBump-${c.id}" ${c.autoBumpPriorityOnBreach ? 'checked' : ''}>
+                        Auto-bump priority on breach
+                    </label>
+                    <button class="g-btn" onclick="saveCategoryEscalation(${c.id})" style="padding:6px 12px; font-size:12px; align-self:flex-start;">
+                        Save escalation settings
+                    </button>
+                </div>
             </div>
         `).join('');
     } catch (e) {
         console.error('Failed to load categories:', e);
         container.innerHTML = '<p style="color:var(--g-red); font-size:13px;">Failed to load categories.</p>';
+    }
+}
+
+async function saveCategoryEscalation(categoryId) {
+    const contact = document.getElementById(`escContact-${categoryId}`).value.trim();
+    const autoBump = document.getElementById(`escBump-${categoryId}`).checked;
+
+    try {
+        const res = await fetchWithAuth(`/api/categories/${categoryId}`, {
+            method: 'PUT',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ escalationContactUsername: contact, autoBumpPriorityOnBreach: autoBump })
+        });
+        if (res.ok) {
+            showMgmtMsg('catMgmtMsg', 'Escalation settings saved.', false);
+            loadCategoryTree();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('catMgmtMsg', err || 'Failed to save escalation settings.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('catMgmtMsg', 'System error. Check console.', true);
     }
 }
 

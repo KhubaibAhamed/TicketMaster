@@ -8,12 +8,19 @@ import com.enterprise.ticketmaster.model.Ticket;
 public class TicketEvent {
     private final Ticket ticket;
     private final NotificationType type;
+    private final String escalationContact; // optional override recipient, used by ESCALATION_TRIGGERED
 
     public TicketEvent(Ticket ticket, NotificationType type) {
+        this(ticket, type, null);
+    }
+
+    public TicketEvent(Ticket ticket, NotificationType type, String escalationContact) {
         this.ticket = ticket;
         this.type = type;
+        this.escalationContact = escalationContact;
     }
 
     public Ticket getTicket() { return ticket; }
     public NotificationType getType() { return type; }
+    public String getEscalationContact() { return escalationContact; }
 }
