@@ -103,6 +103,7 @@ async function logout() {
 let ticketIdPendingResolve = null;
 let currentTickets = [];
 let currentDetailTicketId = null;
+let presenceHeartbeatInterval = null;
 let consoleCurrentPage = 0;
 let allUsers = [];
 let agentWorkload = {};
@@ -993,6 +994,7 @@ async function openTicketDetail(id) {
         renderStatusStepper(ticket);
         renderComments(ticket.comments || []);
         loadCannedResponsesForPicker();
+        startPresenceTracking(ticket.id);
         loadAttachments(ticket.id);
         loadLinkedTickets(ticket.id);
         populateAssignedAgentDropdown(ticket.assignedAgent);
@@ -1001,6 +1003,56 @@ async function openTicketDetail(id) {
         document.getElementById('ticketDetailModal').showModal();
     } catch (e) {
         console.error('Failed to load ticket details:', e);
+    }
+}
+
+// --- Collision detection (Phase B) ---
+function startPresenceTracking(ticketId) {
+    stopPresenceTracking(); // clear any previous ticket's interval first
+    sendPresenceHeartbeat(ticketId); // fire immediately, don't wait 8s for the first check
+    presenceHeartbeatInterval = setInterval(() => sendPresenceHeartbeat(ticketId), 8000);
+}
+
+async function sendPresenceHeartbeat(ticketId) {
+    try {
+        const res = await fetchWithAuth(`/api/tickets/${ticketId}/presence/heartbeat`, {
+            method: 'POST', headers: authHeaders()
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        renderCollisionBanner(data.otherViewers || []);
+    } catch (e) {
+        console.error('Presence heartbeat failed:', e);
+    }
+}
+
+function renderCollisionBanner(otherViewers) {
+    const banner = document.getElementById('collisionBanner');
+    if (!banner) return;
+    if (!otherViewers.length) {
+        banner.style.display = 'none';
+        return;
+    }
+    const names = otherViewers.join(', ');
+    const verb = otherViewers.length === 1 ? 'is' : 'are';
+    banner.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">visibility</span>
+                         &nbsp;${escapeHtml(names)} ${verb} also viewing this ticket right now.`;
+    banner.style.display = 'block';
+}
+
+function stopPresenceTracking() {
+    if (presenceHeartbeatInterval) {
+        clearInterval(presenceHeartbeatInterval);
+        presenceHeartbeatInterval = null;
+    }
+    const banner = document.getElementById('collisionBanner');
+    if (banner) banner.style.display = 'none';
+
+    if (currentDetailTicketId) {
+        // best-effort — don't block modal close on this
+        fetchWithAuth(`/api/tickets/${currentDetailTicketId}/presence`, {
+            method: 'DELETE', headers: authHeaders()
+        }).catch(() => {});
     }
 }
 
@@ -2804,6 +2856,7 @@ document.addEventListener('keydown', (e) => {
 
     lastKey = null;
 });
+document.getElementById('ticketDetailModal')?.addEventListener('close', stopPresenceTracking);
 
 // ===== Shortcut help overlay =====
 function toggleShortcutHelp() {
