@@ -38,10 +38,14 @@ public class NotificationEventListener {
 
         Long ticketId  = ticket.getId();
         String title   = ticket.getTitle();
+        String assignedAgent = ticket.getAssignedAgent();
 
         switch (event.getType()) {
             case TICKET_CREATED -> {
                 notification.setMessage("New ticket #" + ticketId + " raised: " + title);
+                // Intake alert — nobody's personally responsible for it yet, so this goes to admins for oversight
+                notification.setRecipientRole("ADMIN");
+
                 if (emailService != null && !notifyEmail.isBlank()) {
                     emailService.sendTicketCreated(notifyEmail, ticketId, title);
                 }
@@ -59,6 +63,8 @@ public class NotificationEventListener {
             case SLA_WARNING -> {
                 notification.setMessage("⚠️ SLA warning on ticket #" + ticketId
                         + ": 25% of time remaining — " + title);
+                assignOrEscalateToAdmin(notification, assignedAgent);
+
                 if (emailService != null && !notifyEmail.isBlank()) {
                     emailService.sendSlaWarning(notifyEmail, ticketId, title);
                 }
@@ -66,22 +72,26 @@ public class NotificationEventListener {
             case SLA_CRITICAL -> {
                 notification.setMessage("🔴 SLA critical on ticket #" + ticketId
                         + ": 10% of time remaining — " + title);
+                assignOrEscalateToAdmin(notification, assignedAgent);
+
                 if (emailService != null && !notifyEmail.isBlank()) {
                     emailService.sendSlaCritical(notifyEmail, ticketId, title);
                 }
             }
             case SLA_BREACHED -> {
                 notification.setMessage("SLA breached on ticket #" + ticketId + ": " + title);
+                assignOrEscalateToAdmin(notification, assignedAgent);
+
                 if (emailService != null && !notifyEmail.isBlank()) {
                     emailService.sendSlaBreached(notifyEmail, ticketId, title);
                 }
             }
             case TICKET_ASSIGNED -> {
                 notification.setMessage("Ticket #" + ticketId + " has been assigned to you: " + title);
+                notification.setRecipientUsername(assignedAgent);
 
-                String assignedUsername = ticket.getAssignedAgent();
-                if (assignedUsername != null && !assignedUsername.isBlank()) {
-                    userRepository.findByUsername(assignedUsername).ifPresent(user -> {
+                if (assignedAgent != null && !assignedAgent.isBlank()) {
+                    userRepository.findByUsername(assignedAgent).ifPresent(user -> {
                         String agentEmail = user.getEmail();
                         if (emailService != null && agentEmail != null && !agentEmail.isBlank()) {
                             emailService.sendTicketAssignmentEmail(agentEmail, ticket);
@@ -89,12 +99,40 @@ public class NotificationEventListener {
                     });
                 }
             }
-            case TICKET_REOPENED ->
-                    notification.setMessage("Ticket #" + ticketId + " reopened: " + title);
-            case TICKET_AUTO_CLOSED ->
-                    notification.setMessage("Ticket #" + ticketId + " was automatically closed after 3 days in Resolved status.");
+            case TICKET_RESOLVED -> {
+                notification.setMessage("Ticket #" + ticketId + " resolved: " + title);
+                notification.setRecipientUsername(ticket.getRaisedBy());
+
+                String raisedByUsername = ticket.getRaisedBy();
+                if (emailService != null && raisedByUsername != null && !raisedByUsername.isBlank()) {
+                    userRepository.findByUsername(raisedByUsername).ifPresent(user -> {
+                        String raiserEmail = user.getEmail();
+                        if (raiserEmail != null && !raiserEmail.isBlank()) {
+                            emailService.sendTicketResolved(raiserEmail, ticketId, title, ticket.getResolvedBy());
+                        }
+                    });
+                }
+            }
+            case TICKET_REOPENED -> {
+                notification.setMessage("Ticket #" + ticketId + " reopened: " + title);
+                assignOrEscalateToAdmin(notification, assignedAgent);
+            }
+            case TICKET_AUTO_CLOSED -> {
+                notification.setMessage("Ticket #" + ticketId + " was automatically closed after 3 days in Resolved status.");
+                notification.setRecipientUsername(ticket.getRaisedBy());
+            }
         }
 
         notificationRepository.save(notification);
+    }
+
+    // Shared targeting rule: if someone's actually assigned to the ticket, it's their notification.
+    // If nobody's assigned, fall back to an admin broadcast so it doesn't disappear into nowhere.
+    private void assignOrEscalateToAdmin(Notification notification, String assignedAgent) {
+        if (assignedAgent != null && !assignedAgent.isBlank()) {
+            notification.setRecipientUsername(assignedAgent);
+        } else {
+            notification.setRecipientRole("ADMIN");
+        }
     }
 }

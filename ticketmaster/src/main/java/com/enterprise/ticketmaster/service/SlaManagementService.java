@@ -56,8 +56,6 @@ public class SlaManagementService {
             }
             // Save all the breached statuses to the database in one batch
             ticketRepository.saveAll(breachedTickets);
-            // Now that they're persisted, fire an event per ticket so the notification feed picks it up —
-            // this replaces the old "Future Enhancement" comment that used to sit here
             for (Ticket ticket : breachedTickets) {
                 eventPublisher.publishEvent(new TicketEvent(ticket, NotificationType.SLA_BREACHED));
             }
@@ -119,7 +117,6 @@ public class SlaManagementService {
 
         for (Ticket ticket : candidates) {
             ticket.setStatus(Status.CLOSED);
-            ticket.setResolvedAt(null);   // closed — field no longer meaningful
             ticketRepository.save(ticket);
             eventPublisher.publishEvent(
                     new TicketEvent(ticket, NotificationType.TICKET_AUTO_CLOSED)

@@ -207,6 +207,9 @@ public class TicketService {
             if (newStatus == Status.REOPENED && oldStatus != Status.REOPENED) {
                 eventPublisher.publishEvent(new TicketEvent(saved, NotificationType.TICKET_REOPENED));
             }
+            if (newStatus == Status.RESOLVED && oldStatus != Status.RESOLVED) {
+                eventPublisher.publishEvent(new TicketEvent(saved, NotificationType.TICKET_RESOLVED));
+            }
 
             return saved;
         }).orElseThrow(() -> new ResourceNotFoundException("Ticket not found with id: " + id));

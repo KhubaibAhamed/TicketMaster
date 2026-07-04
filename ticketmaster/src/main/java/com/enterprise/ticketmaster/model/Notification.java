@@ -30,6 +30,15 @@ public class Notification {
     @Column(name = "is_read", nullable = false)
     private boolean read = false;
 
+    // Exactly one of these should be set per notification going forward:
+    // - recipientUsername: aimed at one specific person (e.g. the assigned agent, the raiser)
+    // - recipientRole: broadcast to everyone holding that role (e.g. "ADMIN" for intake alerts)
+    @Column(name = "recipient_username")
+    private String recipientUsername;
+
+    @Column(name = "recipient_role")
+    private String recipientRole;
+
     @CreatedDate
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -46,6 +55,10 @@ public class Notification {
     public void setRelatedTicketId(Long relatedTicketId) { this.relatedTicketId = relatedTicketId; }
     public boolean isRead() { return read; }
     public void setRead(boolean read) { this.read = read; }
+    public String getRecipientUsername() { return recipientUsername; }
+    public void setRecipientUsername(String recipientUsername) { this.recipientUsername = recipientUsername; }
+    public String getRecipientRole() { return recipientRole; }
+    public void setRecipientRole(String recipientRole) { this.recipientRole = recipientRole; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }

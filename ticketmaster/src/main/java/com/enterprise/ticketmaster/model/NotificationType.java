@@ -3,6 +3,7 @@ package com.enterprise.ticketmaster.model;
 public enum NotificationType {
     TICKET_CREATED,
     TICKET_ASSIGNED,
+    TICKET_RESOLVED,
     TICKET_REOPENED,
     TICKET_AUTO_CLOSED,
     SLA_WARNING,
