@@ -25,15 +25,17 @@ public class SlaManagementService {
     private final SlaConfigService slaConfigService;
     private final BusinessHoursCalculator businessHoursCalculator;
     private final EscalationService escalationService;
+    private final WebhookDispatchService webhookDispatchService;
 
     public SlaManagementService(TicketRepository ticketRepository, ApplicationEventPublisher eventPublisher,
                                 SlaConfigService slaConfigService, BusinessHoursCalculator businessHoursCalculator,
-                                EscalationService escalationService) {
+                                EscalationService escalationService, WebhookDispatchService webhookDispatchService) {
         this.ticketRepository = ticketRepository;
         this.eventPublisher = eventPublisher;
         this.slaConfigService = slaConfigService;
         this.businessHoursCalculator = businessHoursCalculator;
         this.escalationService = escalationService;
+        this.webhookDispatchService = webhookDispatchService;
     }
 
     // Assigns the initial deadline based on severity, honoring the business-hours calendar if enabled
@@ -64,6 +66,11 @@ public class SlaManagementService {
             for (Ticket ticket : breachedTickets) {
                 eventPublisher.publishEvent(new TicketEvent(ticket, NotificationType.SLA_BREACHED));
                 escalationService.escalate(ticket);
+                webhookDispatchService.dispatch(
+                        com.enterprise.ticketmaster.model.WebhookSubscription.WebhookEventType.SLA_BREACHED,
+                        "🚨 SLA Breach — Ticket #" + ticket.getId() + ": " + ticket.getTitle()
+                                + " (assigned to " + (ticket.getAssignedAgent() != null ? ticket.getAssignedAgent() : "unassigned") + ")"
+                );
             }
         }
     }

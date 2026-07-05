@@ -95,13 +95,38 @@
         if (e.key === 'Enter') login();
     });
 
+    let pendingMfaToken = null;
+
     async function login() {
         const user = document.getElementById('username').value;
         const pass = document.getElementById('password').value;
         const errContainer = document.getElementById('errorContainer');
         const errMessage = document.getElementById('errorMessage');
-
         errContainer.style.display = 'none';
+
+        if (pendingMfaToken) {
+            const code = document.getElementById('mfaCode').value.trim();
+            if (!code) { errMessage.innerText = "Enter your 6-digit code."; errContainer.style.display = 'block'; return; }
+            try {
+                const res = await fetch('/api/auth/login/mfa-verify', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+                    body: JSON.stringify({ mfaToken: pendingMfaToken, code })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    localStorage.setItem('jwt_username', data.username);
+                    localStorage.setItem('jwt_role', data.role);
+                    window.location.href = '/index.html';
+                } else {
+                    errMessage.innerText = "Invalid or expired code.";
+                    errContainer.style.display = 'block';
+                }
+            } catch (e) {
+                errMessage.innerText = "Couldn't connect to server.";
+                errContainer.style.display = 'block';
+            }
+            return;
+        }
 
         if (!user || !pass) {
             errMessage.innerText = "Enter a username and password.";
@@ -111,16 +136,18 @@
 
         try {
             const response = await fetch('/api/auth/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include', // ← allows browser to receive and store HttpOnly cookies
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
                 body: JSON.stringify({ username: user, password: pass })
             });
 
             if (response.ok) {
                 const data = await response.json();
-                // Tokens are now in HttpOnly cookies — never touch them from JS
-                // Only store non-sensitive display data in localStorage
+                if (data.mfaRequired) {
+                    pendingMfaToken = data.mfaToken;
+                    document.getElementById('mfaCodeGroup').style.display = 'block';
+                    document.getElementById('password').closest('.g-input-group').style.display = 'none';
+                    return;
+                }
                 localStorage.setItem('jwt_username', data.username);
                 localStorage.setItem('jwt_role', data.role);
                 window.location.href = '/index.html';

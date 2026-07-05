@@ -42,8 +42,8 @@ public class ReportController {
         for (Object[] row : firstResponseRows) {
             String assignedAgent = (String) row[2];
             if (assignedAgent == null) continue;
-            LocalDateTime ticketCreated  = (LocalDateTime) row[3];
-            LocalDateTime firstCommentAt = (LocalDateTime) row[4];
+            LocalDateTime ticketCreated  = toLocalDateTime(row[3]);
+            LocalDateTime firstCommentAt = toLocalDateTime(row[4]);
             if (ticketCreated == null || firstCommentAt == null) continue;
             double hours = Duration.between(ticketCreated, firstCommentAt).toMinutes() / 60.0;
             firstResponseAccumulator.computeIfAbsent(assignedAgent, k -> new ArrayList<>()).add(hours);
@@ -76,6 +76,13 @@ public class ReportController {
 
         result.sort(Comparator.comparingLong(AgentPerformanceDto::getTotalAssigned).reversed());
         return ResponseEntity.ok(result);
+    }
+    // Native queries can return java.sql.Timestamp instead of LocalDateTime depending on driver/dialect — normalize safely.
+    private LocalDateTime toLocalDateTime(Object value) {
+        if (value == null) return null;
+        if (value instanceof LocalDateTime ldt) return ldt;
+        if (value instanceof java.sql.Timestamp ts) return ts.toLocalDateTime();
+        return null;
     }
 
     @GetMapping("/volume")

@@ -808,6 +808,18 @@
                                margin-bottom:-1px; font-family:var(--font-ui);">
                         Canned Responses
                     </button>
+                    <button id="settingsTab-tabKb" onclick="switchSettingsTab('tabKb')"
+                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
+                               cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
+                               margin-bottom:-1px; font-family:var(--font-ui);">
+                        Knowledge Base
+                    </button>
+                    <button id="settingsTab-tabWebhooks" onclick="switchSettingsTab('tabWebhooks')"
+                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
+                               cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
+                               margin-bottom:-1px; font-family:var(--font-ui);">
+                        Webhooks
+                    </button>
                 </div>
 
                 <!-- Tab: User Directory -->
@@ -840,6 +852,10 @@
                         <div class="g-input-group">
                             <input type="password" id="regPass" placeholder=" ">
                             <label for="regPass">Password</label>
+                        </div>
+                        <div class="g-input-group" id="mfaCodeGroup" style="display:none; margin-bottom: 8px;">
+                            <input type="text" id="mfaCode" placeholder=" " maxlength="6" autocomplete="off">
+                            <label for="mfaCode">6-digit authenticator code</label>
                         </div>
                         <div style="margin-bottom:24px;">
                             <p style="font-size:12px; color:var(--g-text-muted); margin:0 0 16px 0; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Assign Role</p>
@@ -923,7 +939,7 @@
                             <input type="date" id="secLogTo" onchange="loadSecurityLog(0)"
                                    style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
                         </div>
-                        <button class="g-btn" onclick="clearSecurityLogFilters()"
+                            <button class="g-btn" onclick="clearSecurityLogFilters()"
                                 style="padding:8px 16px; font-size:13px;">Clear</button>
                     </div>
 
@@ -942,6 +958,11 @@
                             <tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:32px;">Loading...</td></tr>
                             </tbody>
                         </table>
+                    </div>
+
+                    <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px; margin-top:20px;">
+                        <h3 style="margin:0 0 12px 0; font-family:var(--font-display); font-size:16px;">Two-Factor Authentication</h3>
+                        <div id="mfaStatusView"></div>
                     </div>
 
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
@@ -1161,9 +1182,62 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Tab: Knowledge Base -->
+                <div id="settingsPanel-tabKb" style="display:none;">
+                    <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:24px; align-items:start;">
+                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                            <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">New Article</h3>
+                            <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
+                                Shown to requesters at ticket-creation time when relevant, deflecting tickets before they're filed.
+                            </p>
+                            <div id="kbMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px; font-weight:500;"></div>
+                            <input type="text" id="newKbTitle" placeholder="Title (e.g. 'How to reset your VPN password')"
+                                   style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; margin-bottom:10px; font-family:var(--font-ui);">
+                            <select id="newKbCategory" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; margin-bottom:10px;">
+                                <option value="">No category</option>
+                            </select>
+                            <textarea id="newKbBody" placeholder="Article body (markdown-ish plain text is fine)..." rows="8"
+                                      style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; resize:vertical; font-family:var(--font-ui);"></textarea>
+                            <button class="g-btn g-btn-primary" onclick="createKbArticle()" style="margin-top:10px; padding:8px 16px; font-size:13px;">Publish</button>
+                        </div>
+
+                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                            <h3 style="margin:0 0 16px 0; font-family:var(--font-display); font-size:16px;">All Articles</h3>
+                            <div id="kbArticleList" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;">
+                                <p style="color:var(--g-text-muted); font-size:13px;">Loading articles...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Tab: Webhooks -->
+                <div id="settingsPanel-tabWebhooks" style="display:none;">
+                    <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px; margin-bottom:20px;">
+                        <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">Add Webhook</h3>
+                        <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">Fires on SLA breach. Paste a Slack or Discord incoming-webhook URL.</p>
+                        <div id="webhookMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px; font-weight:500;"></div>
+                        <div style="display:flex; gap:8px;">
+                            <select id="newWebhookPlatform" style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
+                                <option value="SLACK">Slack</option>
+                                <option value="DISCORD">Discord</option>
+                                <option value="GENERIC">Generic (JSON)</option>
+                            </select>
+                            <input type="text" id="newWebhookUrl" placeholder="https://hooks.slack.com/services/..."
+                                   style="flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
+                            <button class="g-btn g-btn-primary" onclick="createWebhook()" style="padding:8px 16px; font-size:13px;">Add</button>
+                        </div>
+                    </div>
+                    <div id="webhookList" style="display:flex; flex-direction:column; gap:10px;">
+                        <p style="color:var(--g-text-muted); font-size:13px;">Loading webhooks...</p>
+                    </div>
+                </div>
             </div>
 
             <div id="viewReports" class="app-view">
+                <div id="csatSummaryCard" style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:20px 24px; margin-bottom:20px;">
+                    <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:15px;">Customer Satisfaction</h3>
+                    <p id="csatSummaryText" style="margin:0; font-size:13px; color:var(--g-text-muted);">Loading...</p>
+                </div>
                 <div class="dashboard-header">
                     <h2>Agent Performance</h2>
                     <p>Resolution velocity, response times and SLA compliance per agent.</p>
@@ -1242,6 +1316,8 @@
             <input type="text" id="title" placeholder=" " required autocomplete="off">
             <label for="title">Incident Title <span style="color: var(--g-red);">*</span></label>
         </div>
+
+        <div id="relatedArticlesPanel" style="display:none; margin-bottom:16px; padding:12px; background:var(--g-background); border-radius:10px;"></div>
 
         <!-- Priority + Category row — each select has its own AI chip below it -->
         <div style="display: flex; gap: 16px; margin-bottom: 32px;">
@@ -1481,6 +1557,18 @@
         </button>
     </div>
 
+    <div id="convertToKbWrapper" style="display:none; margin-bottom:16px;">
+        <button type="button" class="g-btn" onclick="convertTicketToKbArticle()" style="font-size:13px;">
+            <span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">auto_stories</span>
+            Convert to Knowledge Base Article
+        </button>
+    </div>
+
+    <div style="margin-bottom:16px;">
+        <button type="button" class="g-btn" onclick="triageCheckDuplicates()" style="font-size:12px;">Check Duplicates</button>
+    </div>
+    <div id="triageOutputPanel" style="display:none; margin-bottom:16px; padding:12px; background:var(--g-background); border-radius:10px; font-size:13px;"></div>
+
     <!-- Comments panel (default visible) -->
     <div id="detailPanelComments">
         <div id="collisionBanner" style="display:none; background:#FEF7E0; border:1px solid #F9AB00; color:#B06000;
@@ -1518,6 +1606,7 @@
 </dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="/js/app.js"></script>
 <div id="toastContainer"></div>
 <div id="mobileOverlay" onclick="toggleMobileNav()"></div>

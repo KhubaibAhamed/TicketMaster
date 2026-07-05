@@ -115,6 +115,12 @@ public class Ticket {
     @Column(name = "sla_breached")
     private Boolean slaBreached = false;
 
+    @Column(name = "csat_token")
+    private String csatToken; // random token embedded in the resolution email's rating links
+
+    public String getCsatToken() { return csatToken; }
+    public void setCsatToken(String csatToken) { this.csatToken = csatToken; }
+
     @Column(name = "sla_warning_sent", nullable = false)
     private boolean slaWarningSent = false;
 
@@ -137,6 +143,12 @@ public class Ticket {
 
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
+
+    @jakarta.persistence.Transient
+    private java.util.Map<Long, String> customFieldValues = new java.util.HashMap<>();
+
+    public java.util.Map<Long, String> getCustomFieldValues() { return customFieldValues; }
+    public void setCustomFieldValues(java.util.Map<Long, String> customFieldValues) { this.customFieldValues = customFieldValues; }
     
     // ==================== CONSTRUCTORS ====================
 

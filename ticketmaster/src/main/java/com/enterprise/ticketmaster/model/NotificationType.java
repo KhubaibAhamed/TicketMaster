@@ -9,5 +9,6 @@ public enum NotificationType {
     SLA_WARNING,
     SLA_CRITICAL,
     SLA_BREACHED,
-    ESCALATION_TRIGGERED
+    ESCALATION_TRIGGERED,
+    TICKET_MERGED
 }

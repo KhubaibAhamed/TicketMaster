@@ -4,6 +4,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import com.enterprise.ticketmaster.model.*;
 import com.enterprise.ticketmaster.repository.TicketRepository;
+import com.enterprise.ticketmaster.repository.TicketCustomFieldValueRepository;
+import com.enterprise.ticketmaster.repository.CustomFieldDefinitionRepository;
 import com.enterprise.ticketmaster.service.RoutingEngineService;
 import com.enterprise.ticketmaster.service.SlaManagementService;
 import org.springframework.context.ApplicationEventPublisher;
@@ -13,9 +15,13 @@ import com.enterprise.ticketmaster.event.TicketEvent;
 import com.enterprise.ticketmaster.repository.CategoryRepository;
 import com.enterprise.ticketmaster.model.Priority;
 import org.springframework.data.domain.Sort;
+import org.springframework.transaction.annotation.Transactional;
+import com.enterprise.ticketmaster.repository.TicketLinkRepository;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.enterprise.ticketmaster.repository.TicketHistoryRepository;
 
@@ -28,17 +34,26 @@ public class TicketService {
     private final CategoryRepository categoryRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final TicketHistoryRepository ticketHistoryRepository;
+    private final TicketLinkRepository ticketLinkRepository;
+    private final TicketCustomFieldValueRepository customFieldValueRepository;
+    private final CustomFieldDefinitionRepository customFieldDefinitionRepository;
 
     public TicketService(TicketRepository ticketRepository, RoutingEngineService routingEngine,
                          SlaManagementService slaEngine, CategoryRepository categoryRepository,
                          ApplicationEventPublisher eventPublisher,
-                         TicketHistoryRepository ticketHistoryRepository) {
+                         TicketHistoryRepository ticketHistoryRepository,
+                         TicketLinkRepository ticketLinkRepository,
+                         TicketCustomFieldValueRepository customFieldValueRepository,
+                         CustomFieldDefinitionRepository customFieldDefinitionRepository) {
         this.ticketRepository = ticketRepository;
         this.routingEngine = routingEngine;
         this.slaEngine = slaEngine;
         this.categoryRepository = categoryRepository;
         this.eventPublisher = eventPublisher;
         this.ticketHistoryRepository = ticketHistoryRepository;
+        this.ticketLinkRepository = ticketLinkRepository;
+        this.customFieldValueRepository = customFieldValueRepository;
+        this.customFieldDefinitionRepository = customFieldDefinitionRepository;
     }
 
     public Ticket createTicket(Ticket ticket) {
@@ -56,6 +71,18 @@ public class TicketService {
 
         if (saved.getAssignedAgent() != null && !saved.getAssignedAgent().isBlank()) {
             eventPublisher.publishEvent(new TicketEvent(saved, NotificationType.TICKET_ASSIGNED));
+        }
+        if (ticket.getCustomFieldValues() != null && !ticket.getCustomFieldValues().isEmpty()) {
+            ticket.getCustomFieldValues().forEach((fieldDefId, value) -> {
+                customFieldDefinitionRepository.findById(fieldDefId).ifPresent(fieldDef -> {
+                    TicketCustomFieldValue fieldValue = new TicketCustomFieldValue();
+                    fieldValue.setTicketId(saved.getId());
+                    fieldValue.setFieldDefinitionId(fieldDefId);
+                    fieldValue.setFieldName(fieldDef.getFieldName());
+                    fieldValue.setValue(value);
+                    customFieldValueRepository.save(fieldValue);
+                });
+            });
         }
         return saved;
     }
@@ -103,8 +130,15 @@ public class TicketService {
     }
 
     public Ticket getTicketById(Long id) {
-        return ticketRepository.findById(id)
+        Ticket ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ticket not found with id: " + id));
+
+        List<TicketCustomFieldValue> values = customFieldValueRepository.findByTicketId(ticket.getId());
+        Map<Long, String> valueMap = new HashMap<>();
+        values.forEach(v -> valueMap.put(v.getFieldDefinitionId(), v.getValue()));
+        ticket.setCustomFieldValues(valueMap);
+
+        return ticket;
     }
 
     public List<Ticket> getTicketsByStatus(Status status) {
@@ -247,5 +281,46 @@ public class TicketService {
         }
 
         return saved;
+    }
+
+    @Transactional
+    public Ticket mergeTicket(Long duplicateId, Long primaryId, String username) {
+        if (duplicateId.equals(primaryId)) {
+            throw new IllegalArgumentException("A ticket cannot be merged into itself.");
+        }
+        Ticket duplicate = getTicketById(duplicateId);
+        Ticket primary = getTicketById(primaryId);
+
+        Comment noteOnPrimary = new Comment();
+        noteOnPrimary.setTicket(primary);
+        noteOnPrimary.setContent("🔗 Merged duplicate ticket #" + duplicateId + " (\"" + duplicate.getTitle() + "\") into this ticket.");
+        noteOnPrimary.setInternal(true);
+        noteOnPrimary.setAuthorUsername(username);
+        primary.getComments().add(noteOnPrimary);
+
+        Comment noteOnDuplicate = new Comment();
+        noteOnDuplicate.setTicket(duplicate);
+        noteOnDuplicate.setContent("🔗 This ticket was identified as a duplicate and merged into #" + primaryId + " (\"" + primary.getTitle() + "\").");
+        noteOnDuplicate.setInternal(true);
+        noteOnDuplicate.setAuthorUsername(username);
+        duplicate.getComments().add(noteOnDuplicate);
+
+        duplicate.setStatus(Status.CLOSED);
+
+        if (!ticketLinkRepository.linkExists(duplicateId, primaryId)) {
+            TicketLink link = new TicketLink();
+            link.setSourceTicketId(duplicateId);
+            link.setTargetTicketId(primaryId);
+            link.setLinkType(TicketLink.LinkType.DUPLICATES);
+            link.setCreatedBy(username);
+            link.setCreatedAt(LocalDateTime.now());
+            ticketLinkRepository.save(link);
+        }
+
+        ticketRepository.save(primary);
+        Ticket savedDuplicate = ticketRepository.save(duplicate);
+
+        eventPublisher.publishEvent(new TicketEvent(savedDuplicate, NotificationType.TICKET_MERGED));
+        return savedDuplicate;
     }
 }

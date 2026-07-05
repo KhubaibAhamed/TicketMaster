@@ -12,6 +12,7 @@ import com.enterprise.ticketmaster.repository.RefreshTokenRepository;
 import com.enterprise.ticketmaster.service.RefreshTokenService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,6 +24,8 @@ import com.enterprise.ticketmaster.repository.SecurityEventRepository;
 import com.enterprise.ticketmaster.model.SecurityEvent;
 import com.enterprise.ticketmaster.model.PasswordResetRequest;
 import com.enterprise.ticketmaster.repository.PasswordResetRequestRepository;
+import com.enterprise.ticketmaster.service.TotpService;
+import com.enterprise.ticketmaster.service.MfaService;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -40,6 +43,8 @@ public class AuthController {
     private final RefreshTokenRepository refreshTokenRepository;
     private final SecurityEventRepository securityEventRepository;
     private final PasswordResetRequestRepository passwordResetRequestRepository;
+    private final TotpService totpService;
+    private final MfaService mfaService;
 
     public AuthController(UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
@@ -49,7 +54,9 @@ public class AuthController {
                           RefreshTokenService refreshTokenService,
                           RefreshTokenRepository refreshTokenRepository,
                           SecurityEventRepository securityEventRepository,
-                          PasswordResetRequestRepository passwordResetRequestRepository) {
+                          PasswordResetRequestRepository passwordResetRequestRepository,
+                          TotpService totpService,
+                          MfaService mfaService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
@@ -59,6 +66,8 @@ public class AuthController {
         this.refreshTokenRepository = refreshTokenRepository;
         this.securityEventRepository = securityEventRepository;
         this.passwordResetRequestRepository = passwordResetRequestRepository;
+        this.totpService = totpService;
+        this.mfaService = mfaService;
     }
 
     public static class UserResponse {
@@ -127,6 +136,17 @@ public class AuthController {
                 "Login successful.");
         // --- End reset ---
 
+        User authenticatedUser = userOpt.orElseThrow();
+        if (authenticatedUser.isMfaEnabled()) {
+            String mfaToken = mfaService.createPendingLogin(username);
+            return ResponseEntity.ok(Map.of("mfaRequired", true, "mfaToken", mfaToken));
+        }
+
+        return issueSessionAndRespond(username, response);
+    }
+
+    // Extracted so both the normal login path and the post-MFA-verify path can issue the same cookies/response
+    private ResponseEntity<?> issueSessionAndRespond(String username, HttpServletResponse response) {
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
         String accessToken = jwtUtil.generateToken(userDetails);
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(username);
@@ -154,6 +174,67 @@ public class AuthController {
                         .getAuthority().replace("ROLE_", "")
         ));
     }
+
+    @PostMapping("/login/mfa-verify")
+    public ResponseEntity<?> verifyMfaLogin(@RequestBody Map<String, String> body, HttpServletResponse response) {
+        String mfaToken = body.get("mfaToken");
+        String code = body.get("code");
+
+        String username = mfaService.consumePendingLogin(mfaToken);
+        if (username == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("MFA session expired. Please log in again.");
+        }
+
+        User user = userRepository.findByUsername(username).orElse(null);
+        if (user == null || !totpService.verifyCode(user.getMfaSecret(), code)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid code.");
+        }
+
+        return issueSessionAndRespond(username, response);
+    }
+
+    @PostMapping("/mfa/setup")
+    public ResponseEntity<?> setupMfa(Authentication authentication) {
+        String secret = totpService.generateSecret();
+        String otpAuthUrl = totpService.buildOtpAuthUrl(secret, authentication.getName());
+        return ResponseEntity.ok(Map.of("secret", secret, "otpAuthUrl", otpAuthUrl));
+    }
+
+    @PostMapping("/mfa/enable")
+    public ResponseEntity<?> enableMfa(@RequestBody Map<String, String> body, Authentication authentication) {
+        String secret = body.get("secret");
+        String code = body.get("code");
+
+        if (!totpService.verifyCode(secret, code)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid code — check your authenticator app and try again.");
+        }
+
+        User user = userRepository.findByUsername(authentication.getName()).orElseThrow();
+        user.setMfaSecret(secret);
+        user.setMfaEnabled(true);
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Two-factor authentication enabled.");
+    }
+
+    @PostMapping("/mfa/disable")
+    public ResponseEntity<?> disableMfa(@RequestBody Map<String, String> body, Authentication authentication) {
+        User user = userRepository.findByUsername(authentication.getName()).orElseThrow();
+        if (!totpService.verifyCode(user.getMfaSecret(), body.get("code"))) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid code.");
+        }
+        user.setMfaEnabled(false);
+        user.setMfaSecret(null);
+        userRepository.save(user);
+        return ResponseEntity.ok("Two-factor authentication disabled.");
+    }
+
+    @GetMapping("/mfa/status")
+    public ResponseEntity<Map<String, Boolean>> mfaStatus(Authentication authentication) {
+        User user = userRepository.findByUsername(authentication.getName()).orElseThrow();
+        return ResponseEntity.ok(Map.of("mfaEnabled", user.isMfaEnabled()));
+    }
+
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {

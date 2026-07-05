@@ -132,24 +132,33 @@ public class EmailService {
         send(toEmail, subject, body);
     }
 
+    @org.springframework.beans.factory.annotation.Value("${app.base-url}")
+    private String baseUrl;
+
     @Async
-    public void sendTicketResolved(String toEmail, Long ticketId, String title, String resolvedBy) {
+    public void sendTicketResolved(String toEmail, Long ticketId, String title, String resolvedBy, String csatToken) {
         String subject = "✅ Ticket #" + ticketId + " Resolved";
+        String starLinks = java.util.stream.IntStream.rangeClosed(1, 5)
+                .mapToObj(n -> "<a href=\"%s/api/csat/rate?ticketId=%d&token=%s&rating=%d\" style=\"text-decoration:none; font-size:28px; margin:0 4px;\">%s</a>"
+                        .formatted(baseUrl, ticketId, csatToken, n, n <= 5 ? "⭐".repeat(1) : ""))
+                .collect(java.util.stream.Collectors.joining());
         String body = """
-                <div style="font-family: Inter, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <div style="background: #1E8E3E; padding: 24px 32px;">
-                        <h1 style="color: white; margin: 0; font-size: 20px;">Ticketmaster Enterprise</h1>
-                    </div>
-                    <div style="padding: 32px; border: 1px solid #E0E0E0; border-top: none;">
-                        <h2 style="color: #1E8E3E; margin: 0 0 16px 0;">Incident Resolved</h2>
-                        <p style="color: #5F6368;">Ticket <strong>#%d</strong> has been marked as resolved by <strong>%s</strong>.</p>
-                        <div style="background: #E6F4EA; padding: 16px; border-radius: 8px; margin: 24px 0; border-left: 4px solid #1E8E3E;">
-                            <p style="margin: 0; font-weight: 600; color: #1E8E3E;">%s</p>
-                        </div>
-                        <p style="color: #5F6368;">The ticket will be automatically closed after 3 days if no further action is required.</p>
-                    </div>
+            <div style="font-family: Inter, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background: #1E8E3E; padding: 24px 32px;">
+                    <h1 style="color: white; margin: 0; font-size: 20px;">Ticketmaster Enterprise</h1>
                 </div>
-                """.formatted(ticketId, resolvedBy != null ? resolvedBy : "System", title);
+                <div style="padding: 32px; border: 1px solid #E0E0E0; border-top: none;">
+                    <h2 style="color: #1E8E3E; margin: 0 0 16px 0;">Incident Resolved</h2>
+                    <p style="color: #5F6368;">Ticket <strong>#%d</strong> has been marked as resolved by <strong>%s</strong>.</p>
+                    <div style="background: #E6F4EA; padding: 16px; border-radius: 8px; margin: 24px 0; border-left: 4px solid #1E8E3E;">
+                        <p style="margin: 0; font-weight: 600; color: #1E8E3E;">%s</p>
+                    </div>
+                    <p style="color: #5F6368; text-align:center; margin-top:28px;">How did we do?</p>
+                    <div style="text-align:center;">%s</div>
+                    <p style="color: #5F6368;">The ticket will be automatically closed after 3 days if no further action is required.</p>
+                </div>
+            </div>
+            """.formatted(ticketId, resolvedBy != null ? resolvedBy : "System", title, starLinks);
         send(toEmail, subject, body);
     }
 

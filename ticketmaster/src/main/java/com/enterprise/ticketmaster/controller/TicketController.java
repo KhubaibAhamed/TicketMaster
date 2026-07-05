@@ -224,6 +224,21 @@ public class TicketController {
         }
     }
 
+    @PostMapping("/{duplicateId}/merge-into/{primaryId}")
+    public ResponseEntity<?> mergeTicket(@PathVariable Long duplicateId, @PathVariable Long primaryId, Authentication authentication) {
+        boolean isRequester = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_USER"));
+        if (isRequester) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Only agents or admins can merge tickets.");
+        }
+        try {
+            Ticket merged = ticketService.mergeTicket(duplicateId, primaryId, authentication.getName());
+            return ResponseEntity.ok(merged);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     private String str(Object o) { return o != null ? o.toString() : ""; }
     private String csvEscape(String s) {
         if (s == null) return "";

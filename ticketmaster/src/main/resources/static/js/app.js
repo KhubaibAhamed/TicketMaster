@@ -256,6 +256,22 @@ function switchView(viewId, el) {
     }
 }
 
+async function loadCsatSummary() {
+    const el = document.getElementById('csatSummaryText');
+    if (!el) return;
+    try {
+        const res = await fetchWithAuth('/api/csat/summary', { headers: authHeaders() });
+        if (!res.ok) { el.textContent = 'Unable to load CSAT data.'; return; }
+        const data = await res.json();
+        el.textContent = data.averageRating != null
+            ? `${data.averageRating} / 5 average, from ${data.totalRatings} rating(s).`
+            : `No ratings submitted yet (${data.totalRatings} sent, 0 responded).`;
+    } catch (e) {
+        console.error(e);
+        el.textContent = 'Unable to load CSAT data.';
+    }
+}
+
 async function loadCategories() {
     const select = document.getElementById('category');
     try {
@@ -992,6 +1008,11 @@ async function openTicketDetail(id) {
         document.getElementById('detailDescription').innerText = ticket.description;
 
         renderStatusStepper(ticket);
+        const convertWrapper = document.getElementById('convertToKbWrapper');
+        if (convertWrapper) {
+            const isResolved = ticket.status === 'RESOLVED' || ticket.status === 'CLOSED';
+            convertWrapper.style.display = isResolved ? 'block' : 'none';
+        }
         renderComments(ticket.comments || []);
         loadCannedResponsesForPicker();
         startPresenceTracking(ticket.id);
@@ -1003,6 +1024,24 @@ async function openTicketDetail(id) {
         document.getElementById('ticketDetailModal').showModal();
     } catch (e) {
         console.error('Failed to load ticket details:', e);
+    }
+}
+
+async function convertTicketToKbArticle() {
+    if (!currentDetailTicketId) return;
+    try {
+        const res = await fetchWithAuth(`/api/kb/articles/from-ticket/${currentDetailTicketId}`, {
+            method: 'POST', headers: authHeaders()
+        });
+        if (res.ok) {
+            showToast('Article created from this ticket.', 'success');
+        } else {
+            const err = await res.text();
+            showToast(err || 'Failed to create article.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('System error. Check console.', 'error');
     }
 }
 
@@ -1696,7 +1735,7 @@ async function adminRegisterUser() {
 }
 
 function switchSettingsTab(tabId) {
-    ['tabUsers', 'tabRegister', 'tabRequests', 'tabSecurity', 'tabSla', 'tabRouting', 'tabCanned'].forEach(id => {
+    ['tabUsers', 'tabRegister', 'tabRequests', 'tabSecurity', 'tabSla', 'tabRouting', 'tabCanned', 'tabKb', 'tabWebhooks'].forEach(id => {
         const panel = document.getElementById('settingsPanel-' + id);
         const btn   = document.getElementById('settingsTab-' + id);
         if (!panel || !btn) return;
@@ -1708,10 +1747,12 @@ function switchSettingsTab(tabId) {
 
     if (tabId === 'tabUsers')    loadUserDirectory();
     if (tabId === 'tabRequests') loadPasswordRequests();
-    if (tabId === 'tabSecurity') loadSecurityLog(0);
+    if (tabId === 'tabSecurity') { loadSecurityLog(0); loadMfaStatus(); }
     if (tabId === 'tabSla')      loadSlaConfig();
     if (tabId === 'tabRouting')  loadCategoryAndRoutingManagement();
     if (tabId === 'tabCanned')   loadCannedResponseManagement();
+    if (tabId === 'tabKb')       loadKbManagement();
+    if (tabId === 'tabWebhooks') loadWebhooks();
 }
 
 function updateRoleSelection() {
@@ -1911,7 +1952,7 @@ async function loadPasswordRequests() {
     }
 }
 
-// --- Security Event Log (Tier 3) ---
+// --- Security Event Log ---
 let secLogCurrentPage = 0;
 let secLogTotalPages  = 0;
 
@@ -1986,7 +2027,7 @@ async function loadSecurityLog(page) {
     }
 }
 
-// --- SLA Config (Tier 3) ---
+// --- SLA Config ---
 const SLA_WORK_DAYS = ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY'];
 const SLA_WORK_DAY_LABELS = { MONDAY:'Mon', TUESDAY:'Tue', WEDNESDAY:'Wed', THURSDAY:'Thu', FRIDAY:'Fri', SATURDAY:'Sat', SUNDAY:'Sun' };
 
@@ -2095,7 +2136,7 @@ async function saveSlaConfig() {
     }
 }
 
-// --- Categories & Routing Rules (Tier 3) ---
+// --- Categories & Routing Rules ---
 let cachedCategoriesDetailed = [];
 
 function showMgmtMsg(elId, text, isError) {
@@ -2173,8 +2214,26 @@ async function loadCategoryTree() {
                         Save escalation settings
                     </button>
                 </div>
+                <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--g-border);">
+                    <label style="font-size:11px; color:var(--g-text-muted); display:block; margin-bottom:6px;">Custom fields</label>
+                    <div id="customFieldsList-${c.id}"></div>
+                    <div style="display:flex; gap:4px; margin-top:6px;">
+                        <input type="text" id="newFieldName-${c.id}" placeholder="Field name"
+                               style="flex:1; padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px;">
+                        <select id="newFieldType-${c.id}" style="padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px;">
+                            <option value="TEXT">Text</option>
+                            <option value="NUMBER">Number</option>
+                            <option value="DATE">Date</option>
+                            <option value="SELECT">Dropdown</option>
+                        </select>
+                        <input type="text" id="newFieldOptions-${c.id}" placeholder="Options (if dropdown)"
+                               style="flex:1; padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px;">
+                        <button class="g-btn" onclick="addCustomField(${c.id})" style="padding:6px 10px; font-size:12px;">Add</button>
+                    </div>
+                </div>
             </div>
         `).join('');
+        categories.forEach(c => loadCustomFieldsForCategory(c.id));
     } catch (e) {
         console.error('Failed to load categories:', e);
         container.innerHTML = '<p style="color:var(--g-red); font-size:13px;">Failed to load categories.</p>';
@@ -2290,7 +2349,7 @@ async function deleteSubCategory(id) {
     }
 }
 
-// --- Canned Responses (Phase B) ---
+// --- Canned Responses ---
 let cachedCannedResponses = [];
 
 async function loadCannedResponseManagement() {
@@ -2366,6 +2425,149 @@ async function deleteCannedResponse(id, title) {
     } catch (e) {
         console.error(e);
         showMgmtMsg('cannedMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+// --- Related articles live search (Phase C) ---
+let kbSearchDebounceTimer = null;
+
+function scheduleRelatedArticlesSearch() {
+    clearTimeout(kbSearchDebounceTimer);
+    kbSearchDebounceTimer = setTimeout(searchRelatedArticles, 500);
+}
+
+async function searchRelatedArticles() {
+    const title = document.getElementById('title')?.value?.trim() || '';
+    const description = document.getElementById('description')?.value?.trim() || '';
+    const query = (title + ' ' + description).trim();
+    const panel = document.getElementById('relatedArticlesPanel');
+    if (!panel) return;
+
+    if (query.length < 5) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    try {
+        const res = await fetchWithAuth(`/api/kb/articles/search?q=${encodeURIComponent(query)}`, { headers: authHeaders() });
+        if (!res.ok) { panel.style.display = 'none'; return; }
+        const articles = await res.json();
+
+        if (!articles.length) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        panel.innerHTML = `
+            <p style="margin:0 0 8px 0; font-size:12px; font-weight:600; color:var(--g-text-muted);">
+                <span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">auto_stories</span>
+                Related articles — this might solve it faster than filing a ticket:
+            </p>
+            ${articles.map(a => `
+                <div style="padding:8px 10px; border:1px solid var(--g-border); border-radius:8px; margin-bottom:6px; cursor:pointer;"
+                     onclick="viewRelatedArticle(${a.id})">
+                    <span style="font-size:13px; font-weight:500; color:var(--g-blue);">${escapeHtml(a.title)}</span>
+                </div>
+            `).join('')}
+        `;
+        panel.style.display = 'block';
+        window.__kbSearchResults = articles; // cache for the click handler below
+    } catch (e) {
+        console.error('KB search failed:', e);
+        panel.style.display = 'none';
+    }
+}
+
+function viewRelatedArticle(articleId) {
+    const article = (window.__kbSearchResults || []).find(a => a.id === articleId);
+    if (!article) return;
+    alert(`${article.title}\n\n${article.body}`); // simple viewer — swap for a nicer modal if desired later
+}
+
+// --- Knowledge Base ---
+async function loadKbManagement() {
+    const catSelect = document.getElementById('newKbCategory');
+    if (catSelect && catSelect.options.length <= 1 && cachedCategoriesDetailed.length) {
+        catSelect.innerHTML = '<option value="">No category</option>' +
+            cachedCategoriesDetailed.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    }
+
+    const container = document.getElementById('kbArticleList');
+    if (!container) return;
+    renderSkeletonBlock(container, 3);
+    try {
+        const res = await fetchWithAuth('/api/kb/articles', { headers: authHeaders() });
+        if (!res.ok) throw new Error('Request failed');
+        const articles = await res.json();
+
+        if (!articles.length) {
+            container.innerHTML = '<p style="color:var(--g-text-muted); font-size:13px;">No articles yet.</p>';
+            return;
+        }
+
+        container.innerHTML = articles.map(a => `
+            <div style="border:1px solid var(--g-border); border-radius:10px; padding:12px 14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:600; font-size:13px;">${escapeHtml(a.title)}</span>
+                    <button onclick="deleteKbArticle(${a.id}, '${escapeHtml(a.title)}')"
+                            style="border:none; background:transparent; cursor:pointer; color:var(--g-text-muted); display:flex;">
+                        <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
+                    </button>
+                </div>
+                <div style="font-size:11px; color:var(--g-text-muted); margin-top:2px;">
+                    ${a.category ? escapeHtml(a.category.name) : 'Uncategorized'}
+                    ${a.sourceTicketId ? ` · from Ticket #${a.sourceTicketId}` : ''}
+                </div>
+                <p style="margin:6px 0 0 0; font-size:12px; color:var(--g-text-muted); white-space:pre-wrap; max-height:60px; overflow:hidden;">${escapeHtml(a.body)}</p>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load KB articles:', e);
+        container.innerHTML = '<p style="color:var(--g-red); font-size:13px;">Failed to load articles.</p>';
+    }
+}
+
+async function createKbArticle() {
+    const title = document.getElementById('newKbTitle').value.trim();
+    const body = document.getElementById('newKbBody').value.trim();
+    const categoryId = document.getElementById('newKbCategory').value;
+    if (!title || !body) { showMgmtMsg('kbMgmtMsg', 'Title and body are both required.', true); return; }
+
+    try {
+        const res = await fetchWithAuth('/api/kb/articles', {
+            method: 'POST',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, body, categoryId: categoryId ? parseInt(categoryId, 10) : null })
+        });
+        if (res.ok) {
+            document.getElementById('newKbTitle').value = '';
+            document.getElementById('newKbBody').value = '';
+            showMgmtMsg('kbMgmtMsg', 'Article published.', false);
+            loadKbManagement();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('kbMgmtMsg', err || 'Failed to publish article.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('kbMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+async function deleteKbArticle(id, title) {
+    if (!confirm(`Delete article "${title}"?`)) return;
+    try {
+        const res = await fetchWithAuth(`/api/kb/articles/${id}`, { method: 'DELETE', headers: authHeaders() });
+        if (res.ok) {
+            showMgmtMsg('kbMgmtMsg', `"${title}" deleted.`, false);
+            loadKbManagement();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('kbMgmtMsg', err || 'Failed to delete.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('kbMgmtMsg', 'System error. Check console.', true);
     }
 }
 
@@ -2537,7 +2739,8 @@ document.getElementById('ticketForm').addEventListener('submit', async (e) => {
             description: document.getElementById('description').value,
             priority: document.getElementById('priority').value,
             category: { id: Number(document.getElementById('category').value) },
-            status: 'NEW'
+            status: 'NEW',
+            customFieldValues: collectCustomFieldValues()
         })
     });
 
@@ -2555,6 +2758,8 @@ document.getElementById('ticketForm').addEventListener('submit', async (e) => {
 
     // Reset the form
     document.getElementById('ticketForm').reset();
+    document.getElementById('dynamicCustomFieldsContainer').innerHTML = '';
+    currentCustomFieldDefs = [];
     updateCharCounter();
     updateCreateAttachLabel(document.getElementById('createAttachInput'));
     document.getElementById('createModal').close();
@@ -2873,6 +3078,8 @@ document.addEventListener('keydown', (e) => {
     lastKey = null;
 });
 document.getElementById('ticketDetailModal')?.addEventListener('close', stopPresenceTracking);
+document.getElementById('title')?.addEventListener('input', scheduleRelatedArticlesSearch);
+document.getElementById('description')?.addEventListener('input', scheduleRelatedArticlesSearch);
 
 // ===== Shortcut help overlay =====
 function toggleShortcutHelp() {
@@ -2975,4 +3182,268 @@ function showToast(message, type = 'default', duration = 3500) {
     `;
     container.appendChild(toast);
     setTimeout(() => toast.remove(), duration);
+}
+
+// --- Duplicate detection + merge (Phase D) ---
+function showTriageOutput(html) {
+    const panel = document.getElementById('triageOutputPanel');
+    panel.innerHTML = html;
+    panel.style.display = 'block';
+}
+
+async function triageCheckDuplicates() {
+    showTriageOutput('Checking for duplicates...');
+    try {
+        const res = await fetchWithAuth(`/api/tickets/${currentDetailTicketId}/triage/duplicates`, { headers: authHeaders() });
+        const tickets = await res.json();
+        if (!tickets.length) { showTriageOutput('No likely duplicates found.'); return; }
+
+        showTriageOutput('<strong>Possible duplicates:</strong><br>' +
+            tickets.map(t => `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0;">
+                    <span>#${t.id} — ${escapeHtml(t.title)}</span>
+                    <button class="g-btn" style="font-size:11px; padding:4px 10px;"
+                            onclick="mergeDuplicateTicket(${t.id})">Merge into this ticket</button>
+                </div>
+            `).join(''));
+    } catch (e) {
+        console.error(e);
+        showTriageOutput('Failed to check duplicates.');
+    }
+}
+
+async function mergeDuplicateTicket(duplicateId) {
+    if (!confirm(`Merge ticket #${duplicateId} into #${currentDetailTicketId}? #${duplicateId} will be closed.`)) return;
+    try {
+        const res = await fetchWithAuth(`/api/tickets/${duplicateId}/merge-into/${currentDetailTicketId}`, {
+            method: 'POST', headers: authHeaders()
+        });
+        if (res.ok) {
+            showToast(`Ticket #${duplicateId} merged and closed.`, 'success');
+            triageCheckDuplicates(); // refresh the list
+        } else {
+            const err = await res.text();
+            showToast(err || 'Merge failed.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('System error. Check console.', 'error');
+    }
+}
+
+// --- MFA / 2FA (Phase E) ---
+async function loadMfaStatus() {
+    const view = document.getElementById('mfaStatusView');
+    if (!view) return;
+    try {
+        const res = await fetchWithAuth('/api/auth/mfa/status', { headers: authHeaders() });
+        const data = await res.json();
+        view.innerHTML = data.mfaEnabled
+            ? `<p style="font-size:13px; color:var(--g-text-muted); margin-bottom:12px;">2FA is currently <strong>enabled</strong> on your account.</p>
+               <input type="text" id="mfaDisableCode" placeholder="Enter code to disable" maxlength="6"
+                      style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; margin-right:8px;">
+               <button class="g-btn" onclick="disableMfa()" style="font-size:13px;">Disable 2FA</button>`
+            : `<button class="g-btn g-btn-primary" onclick="startMfaSetup()" style="font-size:13px;">Enable 2FA</button>
+               <div id="mfaSetupPanel" style="display:none; margin-top:16px;"></div>`;
+    } catch (e) {
+        console.error(e);
+        view.innerHTML = '<p style="color:var(--g-red); font-size:13px;">Failed to load 2FA status.</p>';
+    }
+}
+
+async function startMfaSetup() {
+    try {
+        const res = await fetchWithAuth('/api/auth/mfa/setup', { method: 'POST', headers: authHeaders() });
+        const data = await res.json();
+        const panel = document.getElementById('mfaSetupPanel');
+        panel.innerHTML = `
+            <p style="font-size:13px; color:var(--g-text-muted);">Scan this with your authenticator app (Google Authenticator, Authy, etc.):</p>
+            <div id="mfaQrCode" style="margin:12px 0;"></div>
+            <p style="font-size:12px; color:var(--g-text-muted);">Or enter this secret manually: <code>${data.secret}</code></p>
+            <input type="text" id="mfaEnableCode" placeholder="Enter the 6-digit code" maxlength="6"
+                   style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; margin-top:8px; margin-right:8px;">
+            <button class="g-btn g-btn-primary" onclick="confirmMfaEnable('${data.secret}')" style="font-size:13px;">Confirm</button>
+        `;
+        panel.style.display = 'block';
+        new QRCode(document.getElementById('mfaQrCode'), { text: data.otpAuthUrl, width: 180, height: 180 });
+    } catch (e) {
+        console.error(e);
+        showToast('Failed to start 2FA setup.', 'error');
+    }
+}
+
+async function confirmMfaEnable(secret) {
+    const code = document.getElementById('mfaEnableCode').value.trim();
+    try {
+        const res = await fetchWithAuth('/api/auth/mfa/enable', {
+            method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ secret, code })
+        });
+        if (res.ok) {
+            showToast('2FA enabled.', 'success');
+            loadMfaStatus();
+        } else {
+            const err = await res.text();
+            showToast(err || 'Invalid code.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('System error. Check console.', 'error');
+    }
+}
+
+async function disableMfa() {
+    const code = document.getElementById('mfaDisableCode').value.trim();
+    try {
+        const res = await fetchWithAuth('/api/auth/mfa/disable', {
+            method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        if (res.ok) {
+            showToast('2FA disabled.', 'success');
+            loadMfaStatus();
+        } else {
+            const err = await res.text();
+            showToast(err || 'Invalid code.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        showToast('System error. Check console.', 'error');
+    }
+}
+
+async function loadWebhooks() {
+    const container = document.getElementById('webhookList');
+    if (!container) return;
+    try {
+        const res = await fetchWithAuth('/api/webhooks', { headers: authHeaders() });
+        const hooks = await res.json();
+        if (!hooks.length) {
+            container.innerHTML = '<p style="color:var(--g-text-muted); font-size:13px;">No webhooks configured.</p>';
+            return;
+        }
+        container.innerHTML = hooks.map(h => `
+            <div style="border:1px solid var(--g-border); border-radius:10px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <span style="font-weight:600; font-size:13px;">${h.platform}</span>
+                    <span style="font-size:12px; color:var(--g-text-muted); margin-left:8px;">${escapeHtml(h.url)}</span>
+                    <span style="font-size:11px; margin-left:8px; color:${h.enabled ? 'var(--g-green)' : 'var(--g-text-muted)'};">${h.enabled ? 'Enabled' : 'Disabled'}</span>
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button class="g-btn" style="font-size:11px; padding:4px 10px;" onclick="testWebhook(${h.id})">Test</button>
+                    <button class="g-btn" style="font-size:11px; padding:4px 10px;" onclick="toggleWebhook(${h.id})">${h.enabled ? 'Disable' : 'Enable'}</button>
+                    <button onclick="deleteWebhook(${h.id})" style="border:none; background:transparent; cursor:pointer; color:var(--g-text-muted); display:flex;">
+                        <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error(e);
+        container.innerHTML = '<p style="color:var(--g-red); font-size:13px;">Failed to load webhooks.</p>';
+    }
+}
+
+async function createWebhook() {
+    const url = document.getElementById('newWebhookUrl').value.trim();
+    const platform = document.getElementById('newWebhookPlatform').value;
+    if (!url) { showMgmtMsg('webhookMgmtMsg', 'URL cannot be blank.', true); return; }
+
+    try {
+        const res = await fetchWithAuth('/api/webhooks', {
+            method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, platform })
+        });
+        if (res.ok) {
+            document.getElementById('newWebhookUrl').value = '';
+            showMgmtMsg('webhookMgmtMsg', 'Webhook added.', false);
+            loadWebhooks();
+        } else {
+            const err = await res.text();
+            showMgmtMsg('webhookMgmtMsg', err || 'Failed to add webhook.', true);
+        }
+    } catch (e) {
+        console.error(e);
+        showMgmtMsg('webhookMgmtMsg', 'System error. Check console.', true);
+    }
+}
+
+async function testWebhook(id) {
+    try {
+        const res = await fetchWithAuth(`/api/webhooks/${id}/test`, { method: 'POST', headers: authHeaders() });
+        showToast(res.ok ? 'Test message sent.' : 'Test failed.', res.ok ? 'success' : 'error');
+    } catch (e) {
+        console.error(e);
+        showToast('System error. Check console.', 'error');
+    }
+}
+
+async function toggleWebhook(id) {
+    try {
+        await fetchWithAuth(`/api/webhooks/${id}/toggle`, { method: 'PUT', headers: authHeaders() });
+        loadWebhooks();
+    } catch (e) {
+        console.error(e);
+        showToast('Failed to toggle webhook.', 'error');
+    }
+}
+
+async function deleteWebhook(id) {
+    if (!confirm('Delete this webhook?')) return;
+    try {
+        await fetchWithAuth(`/api/webhooks/${id}`, { method: 'DELETE', headers: authHeaders() });
+        loadWebhooks();
+    } catch (e) {
+        console.error(e);
+        showToast('Failed to delete webhook.', 'error');
+    }
+}
+
+// --- Dynamic custom fields at ticket creation ---
+let currentCustomFieldDefs = [];
+
+async function renderDynamicCustomFields() {
+    const categoryId = document.getElementById('category').value;
+    const container = document.getElementById('dynamicCustomFieldsContainer');
+    if (!categoryId || !container) { if (container) container.innerHTML = ''; currentCustomFieldDefs = []; return; }
+
+    try {
+        const res = await fetchWithAuth(`/api/custom-fields/by-category/${categoryId}`, { headers: authHeaders() });
+        currentCustomFieldDefs = res.ok ? await res.json() : [];
+    } catch (e) {
+        console.error(e);
+        currentCustomFieldDefs = [];
+    }
+
+    if (!currentCustomFieldDefs.length) { container.innerHTML = ''; return; }
+
+    container.innerHTML = currentCustomFieldDefs.map(f => {
+        const inputId = `customField-${f.id}`;
+        const req = f.required ? 'required' : '';
+        if (f.fieldType === 'SELECT') {
+            const opts = (f.options || '').split(',').map(o => o.trim()).filter(Boolean);
+            return `<div>
+                <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">${escapeHtml(f.fieldName)}</label>
+                <select id="${inputId}" ${req} style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
+                    <option value="">Select...</option>
+                    ${opts.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}
+                </select>
+            </div>`;
+        }
+        const inputType = f.fieldType === 'NUMBER' ? 'number' : f.fieldType === 'DATE' ? 'date' : 'text';
+        return `<div>
+            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">${escapeHtml(f.fieldName)}</label>
+            <input type="${inputType}" id="${inputId}" ${req}
+                   style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
+        </div>`;
+    }).join('');
+}
+
+function collectCustomFieldValues() {
+    const values = {};
+    currentCustomFieldDefs.forEach(f => {
+        const el = document.getElementById(`customField-${f.id}`);
+        if (el && el.value) values[f.id] = el.value;
+    });
+    return values;
 }

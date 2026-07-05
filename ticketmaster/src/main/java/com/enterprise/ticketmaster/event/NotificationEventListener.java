@@ -4,6 +4,7 @@ import com.enterprise.ticketmaster.model.Notification;
 import com.enterprise.ticketmaster.model.NotificationType;
 import com.enterprise.ticketmaster.model.Ticket;
 import com.enterprise.ticketmaster.repository.NotificationRepository;
+import com.enterprise.ticketmaster.repository.TicketRepository;
 import com.enterprise.ticketmaster.repository.UserRepository;
 import com.enterprise.ticketmaster.service.EmailService;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,6 +17,7 @@ public class NotificationEventListener {
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
     private final UserRepository userRepository;
+    private final com.enterprise.ticketmaster.repository.TicketRepository ticketRepository;
 
     @Value("${app.mail.notify:}")
     private String notifyEmail;
@@ -23,10 +25,12 @@ public class NotificationEventListener {
     public NotificationEventListener(NotificationRepository notificationRepository,
                                      @org.springframework.beans.factory.annotation.Autowired(required = false)
                                      EmailService emailService,
-                                     UserRepository userRepository) {
+                                     UserRepository userRepository,
+                                     TicketRepository ticketRepository) {
         this.notificationRepository = notificationRepository;
         this.emailService = emailService;
         this.userRepository = userRepository;
+        this.ticketRepository = ticketRepository;
     }
 
     @EventListener
@@ -108,7 +112,11 @@ public class NotificationEventListener {
                     userRepository.findByUsername(raisedByUsername).ifPresent(user -> {
                         String raiserEmail = user.getEmail();
                         if (raiserEmail != null && !raiserEmail.isBlank()) {
-                            emailService.sendTicketResolved(raiserEmail, ticketId, title, ticket.getResolvedBy());
+                            if (ticket.getCsatToken() == null) {
+                                ticket.setCsatToken(java.util.UUID.randomUUID().toString());
+                                ticketRepository.save(ticket);
+                            }
+                            emailService.sendTicketResolved(raiserEmail, ticketId, title, ticket.getResolvedBy(), ticket.getCsatToken());
                         }
                     });
                 }
@@ -136,6 +144,10 @@ public class NotificationEventListener {
                 } else {
                     notification.setRecipientRole("ADMIN");
                 }
+            }
+            case TICKET_MERGED -> {
+                notification.setMessage("Ticket #" + ticketId + " was identified as a duplicate and merged.");
+                notification.setRecipientUsername(ticket.getRaisedBy());
             }
         }
 

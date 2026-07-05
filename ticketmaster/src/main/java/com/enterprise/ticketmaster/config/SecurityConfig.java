@@ -47,7 +47,15 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
 
                         // 2. PUBLIC AUTH APIs (So users can actually log in)
+                        .requestMatchers("/api/tickets/*/triage/**").hasAnyRole("ADMIN", "DEVELOPER")
                         .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/csat/rate").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/csat/summary").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login/mfa-verify").permitAll()
+                        .requestMatchers("/api/auth/mfa/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/custom-fields/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/custom-fields").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/custom-fields/**").hasRole("ADMIN")
 
                         // 3. RESTRICTED ADMIN APIs (Access Management & Deletion)
                         .requestMatchers("/api/reports/**").hasRole("ADMIN")
@@ -69,6 +77,13 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/canned-responses").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/canned-responses/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/canned-responses/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/kb/articles/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/kb/articles/from-ticket/**").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/kb/articles").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/kb/articles/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/kb/articles/**").hasRole("ADMIN")
+                        .requestMatchers("/api/webhooks/**").hasRole("ADMIN")
+
 
                         // 4. AUTHENTICATED WORKFLOW APIs (Both Admins and Developers)
                         .requestMatchers("/api/tickets/**").authenticated()
