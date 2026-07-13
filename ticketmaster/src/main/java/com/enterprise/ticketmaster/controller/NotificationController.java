@@ -37,6 +37,24 @@ public class NotificationController {
         return ResponseEntity.ok("All notifications marked as read.");
     }
 
+    // Marks exactly the one notification a person clicked, rather than forcing
+    // "mark all as read" just because they opened one item in the list.
+    @PutMapping("/{id}/read")
+    public ResponseEntity<?> markOneRead(@PathVariable Long id, Authentication authentication) {
+        String username = authentication.getName();
+        String role = isAdmin(authentication) ? "ADMIN" : null;
+
+        return notificationRepository.findById(id)
+                .filter(n -> username.equals(n.getRecipientUsername())
+                        || (role != null && role.equals(n.getRecipientRole())))
+                .map(n -> {
+                    n.setRead(true);
+                    notificationRepository.save(n);
+                    return ResponseEntity.ok("Notification marked as read.");
+                })
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
     private boolean isAdmin(Authentication authentication) {
         return authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));

@@ -71,14 +71,14 @@ async function saveSlaConfig() {
     if (!highHours || !mediumHours || !lowHours || highHours <= 0 || mediumHours <= 0 || lowHours <= 0) {
         msgBox.style.display = 'block';
         msgBox.style.background = '#FCE8E6';
-        msgBox.style.color = '#EA4335';
+        msgBox.style.color = 'var(--g-red)';
         msgBox.innerText = 'All three thresholds must be positive numbers.';
         return;
     }
     if (businessHoursEnabled && (!workDays || workStartHour >= workEndHour)) {
         msgBox.style.display = 'block';
         msgBox.style.background = '#FCE8E6';
-        msgBox.style.color = '#EA4335';
+        msgBox.style.color = 'var(--g-red)';
         msgBox.innerText = 'Pick at least one work day and a valid start/end hour range.';
         return;
     }
@@ -101,20 +101,20 @@ async function saveSlaConfig() {
         msgBox.style.display = 'block';
         if (res.ok) {
             msgBox.style.background = '#E6F4EA';
-            msgBox.style.color = '#34A853';
+            msgBox.style.color = 'var(--g-green)';
             msgBox.innerText = 'SLA thresholds updated.';
             showToast('SLA thresholds saved.', 'success');
         } else {
             const errText = await res.text();
             msgBox.style.background = '#FCE8E6';
-            msgBox.style.color = '#EA4335';
+            msgBox.style.color = 'var(--g-red)';
             msgBox.innerText = errText || 'Failed to save SLA settings.';
         }
     } catch (e) {
         console.error('Failed to save SLA config:', e);
         msgBox.style.display = 'block';
         msgBox.style.background = '#FCE8E6';
-        msgBox.style.color = '#EA4335';
+        msgBox.style.color = 'var(--g-red)';
         msgBox.innerText = 'System error. Check console.';
     }
 }
@@ -149,59 +149,89 @@ async function loadCategoryTree() {
         }
 
         container.innerHTML = categories.map(c => `
-            <div style="border:1px solid var(--g-border); border-radius:10px; padding:12px 14px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-weight:600; font-size:13px;">${escapeHtml(c.name)}</span>
-                    <button onclick="deleteCategory(${c.id}, '${escapeHtml(c.name)}')"
+            <div style="border:1px solid var(--g-border); border-radius:14px; padding:18px 20px; margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:14px; border-bottom:1px solid var(--g-border);">
+                    <span style="font-weight:700; font-size:15px; font-family:var(--font-display);">${escapeHtml(c.name)}</span>
+                    <button onclick="deleteCategory(${c.id}, '${escapeHtml(c.name)}')" title="Delete category"
                             style="border:none; background:transparent; cursor:pointer; color:var(--g-text-muted); display:flex;">
                         <span class="material-symbols-rounded" style="font-size:18px;">delete</span>
                     </button>
                 </div>
-                <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
-                    ${c.subCategories.map(sc => `
-                        <span style="display:inline-flex; align-items:center; gap:4px; background:var(--g-background);
-                                     border:1px solid var(--g-border); border-radius:12px; padding:3px 6px 3px 10px; font-size:12px;">
-                            ${escapeHtml(sc.name)}
-                            <span onclick="deleteSubCategory(${sc.id})" style="cursor:pointer; color:var(--g-text-muted); display:flex;">
-                                <span class="material-symbols-rounded" style="font-size:14px;">close</span>
-                            </span>
-                        </span>
-                    `).join('')}
+
+                <!-- Sub-categories -->
+                <div style="margin-top:16px;">
+                    <div class="cat-section-label">
+                        <span class="material-symbols-rounded" aria-hidden="true">account_tree</span>
+                        Sub-categories
+                    </div>
+                    ${c.subCategories.length ? `
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;">
+                            ${c.subCategories.map(sc => `
+                                <span style="display:inline-flex; align-items:center; gap:4px; background:var(--g-background);
+                                             border:1px solid var(--g-border); border-radius:12px; padding:3px 6px 3px 10px; font-size:12px;">
+                                    ${escapeHtml(sc.name)}
+                                    <span onclick="deleteSubCategory(${sc.id})" title="Remove" style="cursor:pointer; color:var(--g-text-muted); display:flex;">
+                                        <span class="material-symbols-rounded" style="font-size:14px;">close</span>
+                                    </span>
+                                </span>
+                            `).join('')}
+                        </div>` : `<p style="font-size:12px; color:var(--g-text-faint); margin:0 0 10px;">No sub-categories yet — add one below.</p>`
+        }
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="newSubCat-${c.id}" placeholder="e.g. Printers"
+                               onkeydown="if(event.key==='Enter') addSubCategory(${c.id})"
+                               style="flex:1; padding:7px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:12.5px; font-family:var(--font-ui);">
+                        <button class="g-btn g-btn-outline" onclick="addSubCategory(${c.id})" style="padding:6px 14px; font-size:12.5px; height:auto;">Add</button>
+                    </div>
                 </div>
-                <div style="display:flex; gap:6px; margin-top:8px;">
-                    <input type="text" id="newSubCat-${c.id}" placeholder="New sub-category"
-                           onkeydown="if(event.key==='Enter') addSubCategory(${c.id})"
-                           style="flex:1; padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px; font-family:var(--font-ui);">
-                    <button class="g-btn" onclick="addSubCategory(${c.id})" style="padding:6px 12px; font-size:12px;">Add</button>
+
+                <!-- Escalation -->
+                <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--g-border);">
+                    <div class="cat-section-label">
+                        <span class="material-symbols-rounded" aria-hidden="true">trending_up</span>
+                        Escalation
+                    </div>
+                    <p style="font-size:12px; color:var(--g-text-faint); margin:0 0 10px;">Who gets notified when a ticket in this category breaches its SLA.</p>
+                    <div style="display:flex; flex-direction:column; gap:8px; background:var(--g-background); border-radius:10px; padding:12px;">
+                        <div>
+                            <label style="font-size:11px; color:var(--g-text-muted); display:block; margin-bottom:4px;">Escalation contact (username, blank = admins)</label>
+                            <input type="text" id="escContact-${c.id}" value="${escapeHtml(c.escalationContactUsername || '')}"
+                                   placeholder="e.g. agent_jane"
+                                   style="width:100%; box-sizing:border-box; padding:7px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:12.5px; font-family:var(--font-ui); background:var(--g-surface);">
+                        </div>
+                        <label style="display:flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer;">
+                            <input type="checkbox" id="escBump-${c.id}" ${c.autoBumpPriorityOnBreach ? 'checked' : ''}>
+                            Auto-bump priority on breach
+                        </label>
+                        <button class="g-btn g-btn-outline" onclick="saveCategoryEscalation(${c.id})" style="padding:6px 14px; font-size:12.5px; align-self:flex-start; height:auto;">
+                            Save escalation settings
+                        </button>
+                    </div>
                 </div>
-                <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--g-border); display:flex; flex-direction:column; gap:6px;">
-                    <label style="font-size:11px; color:var(--g-text-muted);">Escalation contact (username, blank = admins)</label>
-                    <input type="text" id="escContact-${c.id}" value="${escapeHtml(c.escalationContactUsername || '')}"
-                           placeholder="e.g. agent_jane"
-                           style="padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px; font-family:var(--font-ui);">
-                    <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
-                        <input type="checkbox" id="escBump-${c.id}" ${c.autoBumpPriorityOnBreach ? 'checked' : ''}>
-                        Auto-bump priority on breach
-                    </label>
-                    <button class="g-btn" onclick="saveCategoryEscalation(${c.id})" style="padding:6px 12px; font-size:12px; align-self:flex-start;">
-                        Save escalation settings
-                    </button>
-                </div>
-                <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--g-border);">
-                    <label style="font-size:11px; color:var(--g-text-muted); display:block; margin-bottom:6px;">Custom fields</label>
-                    <div id="customFieldsList-${c.id}"></div>
-                    <div style="display:flex; gap:4px; margin-top:6px;">
-                        <input type="text" id="newFieldName-${c.id}" placeholder="Field name"
-                               style="flex:1; padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px;">
-                        <select id="newFieldType-${c.id}" style="padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px;">
-                            <option value="TEXT">Text</option>
-                            <option value="NUMBER">Number</option>
-                            <option value="DATE">Date</option>
-                            <option value="SELECT">Dropdown</option>
-                        </select>
-                        <input type="text" id="newFieldOptions-${c.id}" placeholder="Options (if dropdown)"
-                               style="flex:1; padding:6px 8px; border-radius:6px; border:1px solid var(--g-border); font-size:12px;">
-                        <button class="g-btn" onclick="addCustomField(${c.id})" style="padding:6px 10px; font-size:12px;">Add</button>
+
+                <!-- Custom fields -->
+                <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--g-border);">
+                    <div class="cat-section-label">
+                        <span class="material-symbols-rounded" aria-hidden="true">tune</span>
+                        Custom fields
+                    </div>
+                    <p style="font-size:12px; color:var(--g-text-faint); margin:0 0 10px;">Extra fields agents fill in for tickets raised in this category.</p>
+                    <div id="customFieldsList-${c.id}" style="margin-bottom:10px;"></div>
+                    <div style="background:var(--g-background); border-radius:10px; padding:12px;">
+                        <label style="font-size:11px; color:var(--g-text-muted); display:block; margin-bottom:6px;">Add a field</label>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                            <input type="text" id="newFieldName-${c.id}" placeholder="Field name"
+                                   style="flex:1; min-width:110px; padding:7px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:12.5px; background:var(--g-surface);">
+                            <select id="newFieldType-${c.id}" style="padding:7px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:12.5px; background:var(--g-surface);">
+                                <option value="TEXT">Text</option>
+                                <option value="NUMBER">Number</option>
+                                <option value="DATE">Date</option>
+                                <option value="SELECT">Dropdown</option>
+                            </select>
+                            <input type="text" id="newFieldOptions-${c.id}" placeholder="Options (if dropdown)"
+                                   style="flex:1; min-width:130px; padding:7px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:12.5px; background:var(--g-surface);">
+                            <button class="g-btn g-btn-outline" onclick="addCustomField(${c.id})" style="padding:6px 14px; font-size:12.5px; height:auto;">Add</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -461,6 +491,41 @@ async function deleteCannedResponse(id, title) {
     }
 }
 
+// Article bodies are built server-side as lightweight markdown (## headers,
+// "- " bullet lines) but were being shown as raw text — literal "##" and "-"
+// characters instead of an actual heading and list. This renders just the
+// handful of patterns the backend actually produces; everything is escaped
+// first, so this can't introduce an XSS hole the way blindly injecting
+// markdown-to-HTML output could.
+function renderArticleBodyPreview(text) {
+    const escaped = escapeHtml(text || '');
+    const lines = escaped.split('\n');
+    let html = '';
+    let inList = false;
+
+    lines.forEach(line => {
+        const heading = line.match(/^##\s+(.*)/);
+        const bullet = line.match(/^-\s+(.*)/);
+
+        if (bullet) {
+            if (!inList) { html += '<ul style="margin:4px 0 8px; padding-left:18px;">'; inList = true; }
+            html += `<li style="margin-bottom:2px;">${bullet[1]}</li>`;
+            return;
+        }
+        if (inList) { html += '</ul>'; inList = false; }
+
+        if (heading) {
+            html += `<div style="font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:0.03em; color:var(--g-text-muted); margin:8px 0 2px;">${heading[1]}</div>`;
+        } else if (line.trim() === '') {
+            html += '<br>';
+        } else {
+            html += `<div>${line}</div>`;
+        }
+    });
+    if (inList) html += '</ul>';
+    return html;
+}
+
 // --- Knowledge Base ---
 async function loadKbManagement() {
     const catSelect = document.getElementById('newKbCategory');
@@ -495,7 +560,7 @@ async function loadKbManagement() {
                     ${a.category ? escapeHtml(a.category.name) : 'Uncategorized'}
                     ${a.sourceTicketId ? ` · from Ticket #${a.sourceTicketId}` : ''}
                 </div>
-                <p style="margin:6px 0 0 0; font-size:12px; color:var(--g-text-muted); white-space:pre-wrap; max-height:60px; overflow:hidden;">${escapeHtml(a.body)}</p>
+                <div style="margin:8px 0 0 0; font-size:12px; color:var(--g-text-muted); max-height:110px; overflow:hidden; line-height:1.5;">${renderArticleBodyPreview(a.body)}</div>
             </div>
         `).join('');
     } catch (e) {
@@ -569,8 +634,8 @@ async function loadRoutingRulesTable() {
                 <td>${r.priority ? escapeHtml(r.priority) : '<span style="color:var(--g-text-muted);">Any</span>'}</td>
                 <td>${escapeHtml(r.targetQueue)}</td>
                 <td>${r.autoAssignEnabled
-                    ? `<span style="font-size:12px;">${escapeHtml(r.eligibleAgents || '')}</span>`
-                    : '<span style="color:var(--g-text-muted); font-size:12px;">Off</span>'}</td>
+            ? `<span style="font-size:12px;">${escapeHtml(r.eligibleAgents || '')}</span>`
+            : '<span style="color:var(--g-text-muted); font-size:12px;">Off</span>'}</td>
                 <td>
                     <button onclick="deleteRoutingRule(${r.id})"
                             style="border:none; background:transparent; cursor:pointer; color:var(--g-text-muted); display:flex;">

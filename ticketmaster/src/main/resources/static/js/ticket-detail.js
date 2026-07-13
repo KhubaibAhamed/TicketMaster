@@ -60,35 +60,117 @@ async function reassignAgent(agent) {
     }
 }
 
-function updateSlaPauseButton(ticket) {
-    const btn   = document.getElementById('slaPauseBtn');
-    const icon  = document.getElementById('slaPauseIcon');
-    const label = document.getElementById('slaPauseLabel');
-    if (!btn) return;
+function renderDetailSlaLine(ticket) {
+    const el = document.getElementById('detailSlaLine');
+    if (!el) return;
+    // Reuses the exact same badge language as the console table (buildSlaChipHtml,
+    // defined in tickets-console.js) — SLA urgency should look identical everywhere.
+    el.innerHTML = `<span style="font-size:12px; color:var(--g-text-faint); margin-right:6px;">SLA:</span>${buildSlaChipHtml(ticket)}`;
+}
+
+// Grouped primary actions — everything that moves a ticket forward (reply,
+// acknowledge, resolve, pause/resume SLA, close) lives together in one row,
+// instead of being scattered or (previously) missing from the detail view
+// entirely — acknowledging/resolving used to only be possible from the
+// console table row, so opening a ticket's full detail was a dead end.
+function renderDetailActionBar(ticket) {
+    const bar = document.getElementById('detailActionBar');
+    if (!bar) return;
 
     const role = localStorage.getItem('jwt_role');
+    const isAdmin = role === 'ADMIN';
+    const buttons = [];
 
-    // Only show for ADMIN, and only when ticket is not already resolved/closed
-    const inactiveStatuses = ['RESOLVED', 'CLOSED'];
-    if (role !== 'ADMIN' || inactiveStatuses.includes(ticket.status)) {
-        btn.style.display = 'none';
-        return;
+    buttons.push(`
+        <button type="button" class="g-btn g-btn-outline" onclick="focusReplyBox()">
+            <span class="material-symbols-rounded" style="font-size:16px;" aria-hidden="true">reply</span>
+            Reply
+        </button>`);
+
+    if (['NEW', 'OPEN'].includes(ticket.status)) {
+        buttons.push(`
+            <button type="button" class="g-btn g-btn-primary" onclick="detailAcknowledge()">
+                <span class="material-symbols-rounded" style="font-size:16px;" aria-hidden="true">check</span>
+                Acknowledge
+            </button>`);
+    } else if (['IN_PROGRESS', 'REOPENED'].includes(ticket.status)) {
+        buttons.push(`
+            <button type="button" class="g-btn g-btn-primary" onclick="detailPrepResolve()">
+                <span class="material-symbols-rounded" style="font-size:16px;" aria-hidden="true">task_alt</span>
+                Resolve
+            </button>`);
     }
 
-    btn.style.display = 'inline-flex';
+    // SLA pause/resume — ADMIN only, folded into the same grouped bar rather
+    // than living off on its own next to the status chips.
+    if (isAdmin && !['RESOLVED', 'CLOSED'].includes(ticket.status)) {
+        if (ticket.status === 'PENDING') {
+            buttons.push(`
+                <button type="button" class="g-btn g-btn-outline" onclick="toggleSlaPause()" style="color: var(--g-green); border-color: var(--g-green);">
+                    <span class="material-symbols-rounded" style="font-size:16px;" aria-hidden="true">play_arrow</span>
+                    Resume SLA
+                </button>`);
+        } else {
+            buttons.push(`
+                <button type="button" class="g-btn g-btn-outline" onclick="toggleSlaPause()">
+                    <span class="material-symbols-rounded" style="font-size:16px;" aria-hidden="true">pause</span>
+                    Pause SLA
+                </button>`);
+        }
+    }
 
-    if (ticket.status === 'PENDING') {
-        // Currently paused — show Resume
-        icon.innerText  = 'play_arrow';
-        label.innerText = 'Resume SLA';
-        btn.style.color = 'var(--g-green)';
-        btn.style.borderColor = 'var(--g-green)';
-    } else {
-        // Currently running — show Pause
-        icon.innerText  = 'pause';
-        label.innerText = 'Pause SLA';
-        btn.style.color = 'var(--g-text-muted)';
-        btn.style.borderColor = 'var(--g-border)';
+    if (isAdmin && ticket.status === 'RESOLVED') {
+        buttons.push(`
+            <button type="button" class="g-btn g-btn-outline" onclick="detailClose()">
+                <span class="material-symbols-rounded" style="font-size:16px;" aria-hidden="true">lock</span>
+                Close Ticket
+            </button>`);
+    }
+
+    bar.innerHTML = buttons.join('');
+}
+
+function focusReplyBox() {
+    const textarea = document.getElementById('newCommentContent');
+    if (!textarea) return;
+    textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    textarea.focus();
+}
+
+async function detailAcknowledge() {
+    if (!currentDetailTicketId) return;
+    await startProgress(currentDetailTicketId);
+    openTicketDetail(currentDetailTicketId);
+}
+
+function detailPrepResolve() {
+    if (!currentDetailTicketId) return;
+    prepResolve(currentDetailTicketId);
+}
+
+async function detailClose() {
+    if (!currentDetailTicketId || !currentDetailTicket) return;
+    try {
+        const res = await fetchWithAuth(`/api/tickets/${currentDetailTicketId}`, {
+            method: 'PUT', headers: authHeaders(),
+            body: JSON.stringify({
+                title: currentDetailTicket.title,
+                description: currentDetailTicket.description,
+                priority: currentDetailTicket.priority,
+                status: 'CLOSED'
+            })
+        });
+        if (res.ok) {
+            showToast(`Ticket #${currentDetailTicketId} closed.`, 'success');
+            refreshDataPipeline();
+            loadConsolePage(consoleCurrentPage, consoleSearchQuery);
+            openTicketDetail(currentDetailTicketId);
+        } else {
+            showToast('Failed to close ticket.', 'error');
+        }
+    } catch (e) {
+        console.error('Failed to close ticket:', e);
+        showToast('System error. Check console.', 'error');
     }
 }
 
@@ -210,6 +292,7 @@ async function openTicketDetail(id) {
         if (!response.ok) return;
         const ticket = await response.json();
         currentDetailTicketId = ticket.id;
+        currentDetailTicket = ticket;
 
         document.getElementById('detailTitle').innerText = ticket.title;
         document.getElementById('detailSubId').innerText = `Ticket #${ticket.id} · Raised by ${ticket.raisedBy || 'Unknown'}`;
@@ -222,13 +305,16 @@ async function openTicketDetail(id) {
         statusChip.innerText = ticket.status;
 
         const priorityChip = document.getElementById('detailPriorityChip');
-        priorityChip.className = 'ticket-chip' + (ticket.priority === 'HIGH' ? ' chip-new' : '');
+        const priorityClass = ticket.priority === 'HIGH' ? 'priority-high' : ticket.priority === 'MEDIUM' ? 'priority-medium' : 'priority-low';
+        priorityChip.className = 'priority-chip ' + priorityClass;
         priorityChip.innerText = ticket.priority;
 
         document.getElementById('detailCategoryChip').innerText = ticket.category ? ticket.category.name : 'Uncategorized';
         document.getElementById('detailDescription').innerText = ticket.description;
 
         renderStatusStepper(ticket);
+        renderDetailSlaLine(ticket);
+        renderDetailActionBar(ticket);
         const convertWrapper = document.getElementById('convertToKbWrapper');
         if (convertWrapper) {
             const isResolved = ticket.status === 'RESOLVED' || ticket.status === 'CLOSED';
@@ -240,7 +326,6 @@ async function openTicketDetail(id) {
         loadAttachments(ticket.id);
         loadLinkedTickets(ticket.id);
         populateAssignedAgentDropdown(ticket.assignedAgent);
-        updateSlaPauseButton(ticket);
         switchDetailTab('comments');
         document.getElementById('ticketDetailModal').showModal();
     } catch (e) {
@@ -295,9 +380,10 @@ function renderCollisionBanner(otherViewers) {
     }
     const names = otherViewers.join(', ');
     const verb = otherViewers.length === 1 ? 'is' : 'are';
-    banner.innerHTML = `<span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;">visibility</span>
-                         &nbsp;${escapeHtml(names)} ${verb} also viewing this ticket right now.`;
-    banner.style.display = 'block';
+    banner.innerHTML = `
+        <span class="material-symbols-rounded" aria-hidden="true">visibility</span>
+        <span><strong>${escapeHtml(names)}</strong> ${verb} also looking at this ticket right now.</span>`;
+    banner.style.display = 'flex';
 }
 
 function stopPresenceTracking() {
@@ -377,7 +463,7 @@ async function submitComment() {
 }
 
 async function loadAttachments(ticketId) {
-    const attachContainer = document.getElementById('attachmentsList');
+    const attachContainer = document.getElementById('attachmentList');
     if (!attachContainer) return; // Guard clause if the element doesn't exist
 
     renderSkeletonBlock(attachContainer, 2);
@@ -399,8 +485,8 @@ async function loadAttachments(ticketId) {
                 // Ensure this URL matches your AttachmentController mapping
                 fileLink.href = `/api/tickets/${file.ticketId}/attachments/${file.id}/download`;
                 fileLink.target = '_blank';
-                fileLink.className = 'g-chip bg-blue-50 text-blue-700 hover:bg-blue-100 mr-2 mb-2 inline-flex items-center p-2 rounded-lg';
-                fileLink.innerHTML = `<span class="material-symbols-rounded mr-1 text-sm">attach_file</span> ${escapeHtml(file.originalFilename)}`;
+                fileLink.className = 'attachment-chip';
+                fileLink.innerHTML = `<span class="material-symbols-rounded" aria-hidden="true">attach_file</span> ${escapeHtml(file.originalFilename)}`;
                 attachContainer.appendChild(fileLink);
             });
         } else {
@@ -581,7 +667,7 @@ function insertCannedResponse() {
 }
 
 async function startProgress(id) {
-    const ticket = currentTickets.find(t => t.id === id);
+    const ticket = (currentDetailTicket && currentDetailTicket.id === id) ? currentDetailTicket : currentTickets.find(t => t.id === id);
     if (!ticket) return;
     try {
         const res = await fetchWithAuth(`/api/tickets/${id}`, {
@@ -603,7 +689,7 @@ async function startProgress(id) {
 }
 
 function prepResolve(id) {
-    const ticket = currentTickets.find(t => t.id === id);
+    const ticket = (currentDetailTicket && currentDetailTicket.id === id) ? currentDetailTicket : currentTickets.find(t => t.id === id);
     if (!ticket) return;
     ticketIdPendingResolve = id;
     document.getElementById('resTitle').innerText = ticket.title;
@@ -613,7 +699,7 @@ function prepResolve(id) {
 
 async function submitResolve() {
     if (!ticketIdPendingResolve) return;
-    const ticket = currentTickets.find(t => t.id === ticketIdPendingResolve);
+    const ticket = (currentDetailTicket && currentDetailTicket.id === ticketIdPendingResolve) ? currentDetailTicket : currentTickets.find(t => t.id === ticketIdPendingResolve);
     if (!ticket) return;
 
     const notes   = document.getElementById('resolveNotes').value.trim();
@@ -647,10 +733,12 @@ async function submitResolve() {
     document.getElementById('resolveNotes').value   = '';
     document.getElementById('resolveComment').value = '';
     document.getElementById('resolveCommentInternal').checked = false;
+    const resolvedId = ticketIdPendingResolve;
     ticketIdPendingResolve = null;
     showToast('Ticket resolved and comment posted.', 'success');
     refreshDataPipeline();
     loadConsolePage(consoleCurrentPage, consoleSearchQuery);
+    if (currentDetailTicketId === resolvedId) openTicketDetail(resolvedId);
 }
 
 function switchDetailTab(tab) {

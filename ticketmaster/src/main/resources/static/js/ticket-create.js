@@ -3,10 +3,130 @@
  * =============================================================
  * Depends on: core.js, tickets-console.js (refreshDataPipeline, loadCategories)
  *
- * The create-ticket modal end to end: form submit handler, char counter,
- * attachment label, AI category/priority suggestion, live "Related articles"
- * search-as-you-type, and dynamically rendered custom fields per category.
+ * UX notes (redesign pass):
+ * - Progressive disclosure: the form is a 2-step wizard. Step 1 only asks for
+ *   what only the reporter can know (title + description). Step 2 shows
+ *   priority/category with smart defaults already applied, and tucks custom
+ *   fields + attachments behind a collapsed "Add more detail" disclosure.
+ * - Smart defaults: priority defaults to Medium, category defaults to the
+ *   first available option — both clearly marked as defaults so the user
+ *   scans and adjusts rather than starting from a blank required field.
+ * - Goal-gradient: the progress bar starts at 15% (not 0%) on open, since
+ *   picking defaults already did part of the work.
+ * - Real-time validation: inline, field-level error messages instead of a
+ *   single blocking alert on submit.
  */
+
+const TM_MIN_TITLE_LEN = 5;
+const TM_MIN_DESC_LEN = 15;
+
+// --- Wizard open / reset -----------------------------------------------
+function openCreateModal() {
+    resetWizardUI();
+    applySmartDefaults();
+    document.getElementById('createModal').showModal();
+    document.getElementById('title')?.focus();
+}
+
+function resetWizardUI() {
+    goToWizardStep(1, /* skipValidation */ true);
+    clearFieldError('title');
+    clearFieldError('description');
+    clearFieldError('category');
+    document.getElementById('advancedDetailsPanel')?.removeAttribute('open');
+    setWizardProgress(15);
+}
+
+function applySmartDefaults() {
+    // Priority already defaults to Medium via the selected attribute in markup.
+    const priorityChip = document.getElementById('priorityDefaultChip');
+    if (priorityChip) priorityChip.style.display = 'inline';
+
+    // Category: default to the first real option once categories are loaded,
+    // so the user isn't blocked on a blank required field.
+    const categorySelect = document.getElementById('category');
+    const categoryChip = document.getElementById('categoryDefaultChip');
+    if (categorySelect && !categorySelect.value) {
+        const firstRealOption = Array.from(categorySelect.options).find(o => o.value);
+        if (firstRealOption) {
+            categorySelect.value = firstRealOption.value;
+            if (categoryChip) categoryChip.style.display = 'inline';
+        }
+    }
+}
+
+// --- Wizard step navigation ---------------------------------------------
+function goToWizardStep(step, skipValidation) {
+    if (step === 2 && !skipValidation) {
+        const ok = validateStep1();
+        if (!ok) return;
+    }
+
+    document.getElementById('wizardStep1').style.display = step === 1 ? 'block' : 'none';
+    document.getElementById('wizardStep2').style.display = step === 2 ? 'block' : 'none';
+    document.getElementById('wizardStepLabel1').classList.toggle('active', step === 1);
+    document.getElementById('wizardStepLabel2').classList.toggle('active', step === 2);
+    setWizardProgress(step === 1 ? 15 : 60);
+
+    if (step === 2) {
+        onCategoryChanged(); // load any custom fields for the (possibly defaulted) category
+    }
+}
+
+function setWizardProgress(pct) {
+    const fill = document.getElementById('wizardProgressFill');
+    const bar = document.getElementById('wizardProgressbar');
+    if (fill) fill.style.width = pct + '%';
+    if (bar) bar.setAttribute('aria-valuenow', String(pct));
+}
+
+// --- Real-time / step validation ----------------------------------------
+function validateStep1() {
+    let valid = true;
+    const title = document.getElementById('title').value.trim();
+    const description = document.getElementById('description').value.trim();
+
+    if (title.length < TM_MIN_TITLE_LEN) {
+        setFieldError('title', `Give it a few more words (at least ${TM_MIN_TITLE_LEN} characters) so agents know what they're looking at.`);
+        valid = false;
+    }
+    if (description.length < TM_MIN_DESC_LEN) {
+        setFieldError('description', `A little more detail helps — at least ${TM_MIN_DESC_LEN} characters (what happened, when, who's affected).`);
+        valid = false;
+    }
+    return valid;
+}
+
+function validateStep2() {
+    let valid = true;
+    const category = document.getElementById('category').value;
+    if (!category) {
+        setFieldError('category', 'Pick a category — pick the closest match if you\'re not sure.');
+        valid = false;
+    }
+    return valid;
+}
+
+function setFieldError(fieldId, message) {
+    const errorEl = document.getElementById(fieldId + 'Error');
+    const inputEl = document.getElementById(fieldId);
+    if (errorEl) errorEl.textContent = message;
+    if (inputEl) inputEl.setAttribute('aria-invalid', 'true');
+}
+
+function clearFieldError(fieldId) {
+    const errorEl = document.getElementById(fieldId + 'Error');
+    const inputEl = document.getElementById(fieldId);
+    if (errorEl) errorEl.textContent = '';
+    if (inputEl) inputEl.removeAttribute('aria-invalid');
+}
+
+function onCategoryChanged() {
+    document.getElementById('categoryAiChip').style.display = 'none';
+    document.getElementById('categoryDefaultChip').style.display = 'none';
+    clearFieldError('category');
+    renderDynamicCustomFields();
+}
 
 function updateCharCounter() {
     const textarea = document.getElementById('description');
@@ -63,12 +183,13 @@ async function searchRelatedArticles() {
 
         panel.innerHTML = `
             <p style="margin:0 0 8px 0; font-size:12px; font-weight:600; color:var(--g-text-muted);">
-                <span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;">auto_stories</span>
+                <span class="material-symbols-rounded" style="font-size:14px; vertical-align:middle;" aria-hidden="true">auto_stories</span>
                 Related articles — this might solve it faster than filing a ticket:
             </p>
             ${articles.map(a => `
                 <div style="padding:8px 10px; border:1px solid var(--g-border); border-radius:8px; margin-bottom:6px; cursor:pointer;"
-                     onclick="viewRelatedArticle(${a.id})">
+                     onclick="viewRelatedArticle(${a.id})" role="button" tabindex="0"
+                     onkeypress="if(event.key==='Enter') viewRelatedArticle(${a.id})">
                     <span style="font-size:13px; font-weight:500; color:var(--g-blue);">${escapeHtml(a.title)}</span>
                 </div>
             `).join('')}
@@ -91,23 +212,43 @@ function viewRelatedArticle(articleId) {
 document.getElementById('ticketForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // 1. Capture the response to get the newly created ticket's ID
-    const response = await fetchWithAuth('/api/tickets', {
-        method: 'POST', headers: authHeaders(),
-        body: JSON.stringify({
-            title: document.getElementById('title').value,
-            description: document.getElementById('description').value,
-            priority: document.getElementById('priority').value,
-            category: { id: Number(document.getElementById('category').value) },
-            status: 'NEW',
-            customFieldValues: collectCustomFieldValues()
-        })
-    });
+    if (!validateStep2()) return;
+
+    const submitBtn = document.getElementById('submitTicketBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+    setWizardProgress(85);
+
+    let response;
+    try {
+        response = await fetchWithAuth('/api/tickets', {
+            method: 'POST', headers: authHeaders(),
+            body: JSON.stringify({
+                title: document.getElementById('title').value,
+                description: document.getElementById('description').value,
+                priority: document.getElementById('priority').value,
+                category: { id: Number(document.getElementById('category').value) },
+                status: 'NEW',
+                customFieldValues: collectCustomFieldValues()
+            })
+        });
+    } catch (err) {
+        showToast("Couldn't reach the server. Please check your connection and try again.", 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Ticket';
+        setWizardProgress(60);
+        return;
+    }
 
     if (!response.ok) {
         showToast('Failed to raise ticket. Please try again.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Ticket';
+        setWizardProgress(60);
         return;
     }
+
+    setWizardProgress(100);
 
     // 2. Extract the actual ticket data from the server
     const createdTicket = await response.json();
@@ -123,6 +264,9 @@ document.getElementById('ticketForm').addEventListener('submit', async (e) => {
     updateCharCounter();
     updateCreateAttachLabel(document.getElementById('createAttachInput'));
     document.getElementById('createModal').close();
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit Ticket';
+    resetWizardUI();
 
     // 3. Upload attachments using the REAL new ticket ID
     if (files && files.length > 0) {
@@ -170,11 +314,17 @@ async function suggestClassification() {
 
         const result = await response.json();
 
+        // A suggestion means the reporter is past step 1's blank-page moment,
+        // so take them straight to step 2 where the suggested values live.
+        goToWizardStep(2);
+
         if (result.suggestedCategoryId) {
             const categorySelect = document.getElementById('category');
             if (categorySelect) {
                 categorySelect.value = result.suggestedCategoryId;
                 document.getElementById('categoryAiChip').style.display = 'inline-flex';
+                document.getElementById('categoryDefaultChip').style.display = 'none';
+                renderDynamicCustomFields();
             }
         }
 
@@ -183,6 +333,7 @@ async function suggestClassification() {
             if (prioritySelect) {
                 prioritySelect.value = result.suggestedPriority;
                 document.getElementById('priorityAiChip').style.display = 'inline-flex';
+                document.getElementById('priorityDefaultChip').style.display = 'none';
             }
         }
 
@@ -194,6 +345,7 @@ async function suggestClassification() {
     } catch (err) {
         btn.textContent = '✨ Suggest Category & Priority';
         console.error('Classification error:', err);
+        showToast("Couldn't get a suggestion right now — pick manually on the next step.", 'warning');
     } finally {
         btn.disabled = false;
     }
@@ -223,7 +375,7 @@ async function renderDynamicCustomFields() {
         if (f.fieldType === 'SELECT') {
             const opts = (f.options || '').split(',').map(o => o.trim()).filter(Boolean);
             return `<div>
-                <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">${escapeHtml(f.fieldName)}</label>
+                <label for="${inputId}" style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">${escapeHtml(f.fieldName)}</label>
                 <select id="${inputId}" ${req} style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
                     <option value="">Select...</option>
                     ${opts.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}
@@ -232,11 +384,19 @@ async function renderDynamicCustomFields() {
         }
         const inputType = f.fieldType === 'NUMBER' ? 'number' : f.fieldType === 'DATE' ? 'date' : 'text';
         return `<div>
-            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">${escapeHtml(f.fieldName)}</label>
+            <label for="${inputId}" style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">${escapeHtml(f.fieldName)}</label>
             <input type="${inputType}" id="${inputId}" ${req}
                    style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
         </div>`;
     }).join('');
+
+    // Custom fields exist for this category — open the disclosure automatically
+    // so the user notices them, rather than hiding required fields silently.
+    const hasRequired = currentCustomFieldDefs.some(f => f.required);
+    if (hasRequired) {
+        const details = document.getElementById('advancedDetailsPanel');
+        if (details) details.open = true;
+    }
 }
 
 function collectCustomFieldValues() {

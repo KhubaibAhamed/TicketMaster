@@ -111,10 +111,15 @@ public class TicketService {
         String raisedByParam      = (raisedBy      != null && !raisedBy.isBlank())      ? raisedBy      : null;
         String assignedAgentParam = (assignedAgent  != null && !assignedAgent.isBlank()) ? assignedAgent : null;
 
-        if (q.isBlank() && status == null && priority == null && categoryId == null
-                && raisedByParam == null && assignedAgentParam == null) {
-            return getTicketsPaginated(page, size);
-        }
+        // Previously, a request with zero filters (q/status/priority/category/
+        // raisedBy/assignedAgent all empty — which is exactly an ADMIN's
+        // default, unfiltered Operations Console view) took a shortcut to
+        // getTicketsPaginated(), which builds its PageRequest with no Sort at
+        // all, silently discarding whatever the sort dropdown was set to.
+        // Developer/User views usually have a filter active (assigned-to-me,
+        // raised-by-me) so they never hit that shortcut, which is why sorting
+        // looked like it "worked for dev but not admin." Always go through
+        // the query that actually honors the requested Sort.
         Sort sort = parseSort(sortParam);
         return ticketRepository.searchWithFiltersSorted(q, numericQ, status, priority,
                 categoryId, raisedByParam, assignedAgentParam, PageRequest.of(page, size, sort));

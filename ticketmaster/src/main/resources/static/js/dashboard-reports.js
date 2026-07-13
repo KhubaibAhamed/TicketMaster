@@ -10,6 +10,18 @@
  *      presets).
  */
 
+/**
+ * Charts previously used a hardcoded Google-Material color set (var(--g-blue),
+ * var(--g-green), var(--g-red)...) left over from before the TrackTicket brand existed.
+ * This pulls the real, current brand tokens from CSS at render time instead,
+ * so charts always match whatever the stylesheet defines — one palette,
+ * not two.
+ */
+function brandColor(varName, fallback) {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+    return v || fallback;
+}
+
 async function loadCsatSummary() {
     const el = document.getElementById('csatSummaryText');
     if (!el) return;
@@ -110,13 +122,27 @@ function setReportRangePreset(days) {
 
     document.getElementById('reportFrom').value = toDateInputValue(from);
     document.getElementById('reportTo').value   = toDateInputValue(to);
+    activeRangePreset = days;
+    updateReportPresetButtons();
     loadAgentPerformance();
 }
 
 function clearReportRange() {
     document.getElementById('reportFrom').value = '';
     document.getElementById('reportTo').value   = '';
+    activeRangePreset = 'all';
+    updateReportPresetButtons();
     loadAgentPerformance();
+}
+
+// Gives the selected range a persistent highlight instead of only a hover
+// state — previously there was no visual indication of which preset (if
+// any) was actually currently applied.
+function updateReportPresetButtons() {
+    const map = { 7: 'presetBtn7', 30: 'presetBtn30', all: 'presetBtnAll' };
+    Object.values(map).forEach(id => document.getElementById(id)?.classList.remove('active'));
+    const activeId = map[activeRangePreset];
+    if (activeId) document.getElementById(activeId)?.classList.add('active');
 }
 
 function updateReportRangeLabel(from, to) {
@@ -136,10 +162,10 @@ function updateReportRangeLabel(from, to) {
 async function loadVolumeTrend(days) {
     activeVolumeDays = days || 30;
 
-    // Highlight active button
+    // Highlight active segment
     ['vol7', 'vol30', 'vol90'].forEach(id => {
         const btn = document.getElementById(id);
-        if (btn) btn.style.fontWeight = id === 'vol' + activeVolumeDays ? '700' : '400';
+        if (btn) btn.classList.toggle('active', id === 'vol' + activeVolumeDays);
     });
 
     try {
@@ -159,6 +185,10 @@ async function loadVolumeTrend(days) {
         if (!ctx) return;
         if (volumeChartInstance) volumeChartInstance.destroy();
 
+        const lineColor = brandColor('--g-blue-dark', '#023e8a');
+        const tickColor = brandColor('--g-text-muted', '#3D5170');
+        const gridColor = brandColor('--g-border', '#DCEEF5');
+
         volumeChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
@@ -166,10 +196,10 @@ async function loadVolumeTrend(days) {
                 datasets: [{
                     label: 'Tickets raised',
                     data: counts,
-                    borderColor: '#1A73E8',
-                    backgroundColor: 'rgba(26,115,232,0.08)',
+                    borderColor: lineColor,
+                    backgroundColor: lineColor + '15',
                     borderWidth: 2,
-                    pointBackgroundColor: '#1A73E8',
+                    pointBackgroundColor: lineColor,
                     pointRadius: 4,
                     pointHoverRadius: 6,
                     tension: 0.3,
@@ -189,7 +219,7 @@ async function loadVolumeTrend(days) {
                 },
                 scales: {
                     x: {
-                        ticks: { font: { family: 'Inter', size: 11 }, color: '#5F6368' },
+                        ticks: { font: { family: 'Inter', size: 11 }, color: tickColor },
                         grid: { display: false },
                         border: { display: false }
                     },
@@ -197,10 +227,10 @@ async function loadVolumeTrend(days) {
                         beginAtZero: true,
                         ticks: {
                             font: { family: 'Inter', size: 11 },
-                            color: '#5F6368',
+                            color: tickColor,
                             precision: 0
                         },
-                        grid: { color: '#F1F3F4' },
+                        grid: { color: gridColor },
                         border: { display: false }
                     }
                 }
@@ -226,7 +256,9 @@ function renderSlaMetric(tickets) {
     const compliant = withDeadline.filter(t => !t.slaBreached).length;
     const pct = Math.round((compliant / withDeadline.length) * 100);
     document.getElementById('metricSla').innerText = `${pct}%`;
-    const barColor = pct >= 80 ? '#1E8E3E' : pct >= 60 ? '#F9AB00' : '#D93025';
+    const barColor = pct >= 80 ? brandColor('--viz-green', '#16A34A')
+        : pct >= 60 ? brandColor('--viz-orange', '#F59E0B')
+            : brandColor('--viz-red', '#E11D48');
     document.getElementById('slaProgressBar').style.width = `${pct}%`;
     document.getElementById('slaProgressBar').style.background = barColor;
     document.getElementById('metricSla').style.color = barColor;
@@ -278,6 +310,10 @@ function buildChart(type, labels, values, colors, opts = {}) {
 
     const baseFont = { family: 'Inter', size: 12 };
     const borderRadius = type === 'bar' ? 6 : 0;
+    const surfaceColor = brandColor('--g-surface', '#FFFFFF');
+    const mutedColor   = brandColor('--g-text-muted', '#3D5170');
+    const mainColor    = brandColor('--g-text-main', '#0A1128');
+    const gridColor    = brandColor('--g-border', '#DCEEF5');
 
     mainChartInstance = new Chart(ctx, {
         type,
@@ -286,7 +322,7 @@ function buildChart(type, labels, values, colors, opts = {}) {
             datasets: [{
                 data: values,
                 backgroundColor: type === 'doughnut' ? colors : colors.map(c => c + 'CC'),
-                borderColor: type === 'doughnut' ? '#FFFFFF' : colors,
+                borderColor: type === 'doughnut' ? surfaceColor : colors,
                 borderWidth: type === 'doughnut' ? 3 : 2,
                 borderRadius: type !== 'doughnut' ? borderRadius : undefined,
                 hoverOffset: type === 'doughnut' ? 6 : undefined,
@@ -304,7 +340,7 @@ function buildChart(type, labels, values, colors, opts = {}) {
                     position: 'right',
                     labels: {
                         font: baseFont,
-                        color: '#5F6368',
+                        color: mutedColor,
                         padding: 16,
                         usePointStyle: true,
                         pointStyleWidth: 8
@@ -318,12 +354,12 @@ function buildChart(type, labels, values, colors, opts = {}) {
             },
             scales: type !== 'doughnut' ? {
                 x: {
-                    ticks: { font: baseFont, color: '#5F6368', precision: 0 },
-                    grid: { color: '#F1F3F4' },
+                    ticks: { font: baseFont, color: mutedColor, precision: 0 },
+                    grid: { color: gridColor },
                     border: { display: false }
                 },
                 y: {
-                    ticks: { font: baseFont, color: '#202124' },
+                    ticks: { font: baseFont, color: mainColor },
                     grid: { display: false },
                     border: { display: false }
                 }
@@ -332,15 +368,50 @@ function buildChart(type, labels, values, colors, opts = {}) {
     });
 }
 
+function showChartEmptyState(canvasId, message) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    canvas.style.display = 'none';
+    let placeholder = canvas.parentElement.querySelector('.chart-empty-state');
+    if (!placeholder) {
+        placeholder = document.createElement('div');
+        placeholder.className = 'chart-empty-state';
+        canvas.parentElement.appendChild(placeholder);
+    }
+    placeholder.innerHTML = `
+        <span class="material-symbols-rounded" aria-hidden="true">insights</span>
+        <span>${message}</span>`;
+    placeholder.style.display = 'flex';
+}
+
+function hideChartEmptyState(canvasId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    canvas.style.display = 'block';
+    const placeholder = canvas.parentElement.querySelector('.chart-empty-state');
+    if (placeholder) placeholder.style.display = 'none';
+}
+
 function renderStatusChart(tickets) {
     const order  = ['OPEN', 'IN_PROGRESS', 'NEW', 'PENDING', 'REOPENED', 'RESOLVED', 'CLOSED'];
-    const colors = { OPEN:'#4285F4', IN_PROGRESS:'#F9AB00', NEW:'#1A73E8',
-        PENDING:'#FBBC04', REOPENED:'#D93025', RESOLVED:'#1E8E3E', CLOSED:'#137333' };
+    // Vivid, clearly differentiated status palette. CLOSED — often the
+    // largest slice — gets neutral slate rather than dark navy, so the whole
+    // chart doesn't read as one dominant navy blob.
+    const colors = {
+        OPEN:         brandColor('--viz-blue', '#2563EB'),
+        NEW:          brandColor('--viz-purple', '#7C3AED'),
+        IN_PROGRESS:  brandColor('--viz-orange', '#F59E0B'),
+        PENDING:      brandColor('--tm-signal', '#00b4d8'),
+        REOPENED:     brandColor('--viz-red', '#E11D48'),
+        RESOLVED:     brandColor('--viz-green', '#16A34A'),
+        CLOSED:       brandColor('--viz-slate', '#64748B')
+    };
     const counts = {};
     order.forEach(s => counts[s] = 0);
     tickets.forEach(t => { if (counts[t.status] !== undefined) counts[t.status]++; });
     const active = order.filter(s => counts[s] > 0);
-    if (!active.length) return;
+    if (!active.length) { showChartEmptyState('mainChart', 'No tickets yet — raise one to see the status breakdown.'); return; }
+    hideChartEmptyState('mainChart');
     buildChart('doughnut', active, active.map(s => counts[s]), active.map(s => colors[s]));
 }
 
@@ -353,7 +424,13 @@ function renderCategoryChart(tickets) {
     const sorted  = Object.entries(counts).sort((a, b) => b[1] - a[1]);
     const labels  = sorted.map(([k]) => k);
     const values  = sorted.map(([, v]) => v);
-    const palette = ['#1A73E8','#34A853','#FBBC04','#EA4335','#9334E6','#00ACC1'];
+    if (!labels.length) { showChartEmptyState('mainChart', 'No category data yet.'); return; }
+    hideChartEmptyState('mainChart');
+    // A varied, vivid qualitative palette — categories aren't ordered/sequential
+    // data, so they read better as clearly distinct hues rather than shades
+    // of one color.
+    const palette = ['--viz-blue', '--viz-green', '--viz-orange', '--viz-red', '--viz-purple', '--tm-signal']
+        .map(v => brandColor(v, '#2563EB'));
     buildChart('bar', labels, values, labels.map((_, i) => palette[i % palette.length]), { horizontal: true });
 }
 
@@ -361,6 +438,12 @@ function renderPriorityChart(tickets) {
     const counts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
     tickets.forEach(t => { if (counts[t.priority] !== undefined) counts[t.priority]++; });
     const labels = Object.keys(counts).filter(p => counts[p] > 0);
-    const colors = { HIGH: '#D93025', MEDIUM: '#F9AB00', LOW: '#1E8E3E' };
+    if (!labels.length) { showChartEmptyState('mainChart', 'No priority data yet.'); return; }
+    hideChartEmptyState('mainChart');
+    const colors = {
+        HIGH:   brandColor('--viz-red', '#E11D48'),
+        MEDIUM: brandColor('--viz-orange', '#F59E0B'),
+        LOW:    brandColor('--viz-green', '#16A34A')
+    };
     buildChart('bar', labels, labels.map(p => counts[p]), labels.map(p => colors[p]));
 }

@@ -26,7 +26,7 @@ async function adminRegisterUser() {
         if (response.ok) {
             msgBox.style.display = 'block';
             msgBox.style.backgroundColor = '#E6F4EA';
-            msgBox.style.color = '#1E8E3E';
+            msgBox.style.color = 'var(--g-green)';
             msgBox.innerText = `✓ Account created successfully for ${u}`;
 
             // Clear the form
@@ -51,20 +51,41 @@ async function adminRegisterUser() {
     }
 }
 
+// Page title/subtitle/stats-visibility per settings tab — each destination
+// now has its own sidebar entry, so it needs its own honest description
+// instead of every one saying "Access Management / Manage users, roles...".
+const SETTINGS_TAB_META = {
+    tabUsers:    { title: 'User Directory',        subtitle: 'See and manage everyone with access to TrackTicket.', stats: true },
+    tabRegister: { title: 'Register User',         subtitle: 'Create a new account and assign a role.', stats: false },
+    tabRequests: { title: 'Password Requests',     subtitle: 'Review and action pending password reset requests.', stats: false },
+    tabSecurity: { title: 'Security Log',          subtitle: 'Audit trail of authentication and security-relevant events.', stats: false },
+    tabMfa:      { title: 'Two-Factor Authentication', subtitle: 'Require a 6-digit authenticator code at sign-in.', stats: false },
+    tabSla:      { title: 'SLA Settings',          subtitle: 'Configure response-time windows by priority and business hours.', stats: false },
+    tabRouting:  { title: 'Categories & Routing',  subtitle: 'Manage ticket categories and automatic routing rules.', stats: false },
+    tabCanned:   { title: 'Canned Responses',      subtitle: "Reusable reply templates agents can insert into any comment box.", stats: false },
+    tabKb:       { title: 'Knowledge Base',        subtitle: 'Self-service articles shown to requesters before they file a ticket.', stats: false },
+    tabWebhooks: { title: 'Webhooks',              subtitle: 'Outgoing notifications fired on SLA breach.', stats: false }
+};
+
 function switchSettingsTab(tabId) {
-    ['tabUsers', 'tabRegister', 'tabRequests', 'tabSecurity', 'tabSla', 'tabRouting', 'tabCanned', 'tabKb', 'tabWebhooks'].forEach(id => {
+    ['tabUsers', 'tabRegister', 'tabRequests', 'tabSecurity', 'tabMfa', 'tabSla', 'tabRouting', 'tabCanned', 'tabKb', 'tabWebhooks'].forEach(id => {
         const panel = document.getElementById('settingsPanel-' + id);
-        const btn   = document.getElementById('settingsTab-' + id);
-        if (!panel || !btn) return;
-        const isActive = id === tabId;
-        panel.style.display = isActive ? 'block' : 'none';
-        btn.style.borderBottomColor = isActive ? 'var(--g-blue)' : 'transparent';
-        btn.style.color = isActive ? 'var(--g-blue)' : 'var(--g-text-muted)';
+        if (!panel) return;
+        panel.style.display = id === tabId ? 'block' : 'none';
     });
+
+    const meta = SETTINGS_TAB_META[tabId] || SETTINGS_TAB_META.tabUsers;
+    const titleEl    = document.getElementById('settingsPageTitle');
+    const subtitleEl = document.getElementById('settingsPageSubtitle');
+    const statsRow   = document.getElementById('settingsStatsRow');
+    if (titleEl)    titleEl.innerText = meta.title;
+    if (subtitleEl) subtitleEl.innerText = meta.subtitle;
+    if (statsRow)   statsRow.style.display = meta.stats ? 'flex' : 'none';
 
     if (tabId === 'tabUsers')    loadUserDirectory();
     if (tabId === 'tabRequests') loadPasswordRequests();
-    if (tabId === 'tabSecurity') { loadSecurityLog(0); loadMfaStatus(); }
+    if (tabId === 'tabSecurity') loadSecurityLog(0);
+    if (tabId === 'tabMfa')      loadMfaStatus();
     if (tabId === 'tabSla')      loadSlaConfig();
     if (tabId === 'tabRouting')  loadCategoryAndRoutingManagement();
     if (tabId === 'tabCanned')   loadCannedResponseManagement();
@@ -78,8 +99,8 @@ function updateRoleSelection() {
     const labelAdmin = document.getElementById('roleLabelAdmin');
     const labelUser  = document.getElementById('roleLabelUser');
     if (labelDev)   labelDev.style.borderColor   = selected === 'DEVELOPER' ? 'var(--g-blue)'   : 'var(--g-border)';
-    if (labelAdmin) labelAdmin.style.borderColor = selected === 'ADMIN'     ? '#EA4335'          : 'var(--g-border)';
-    if (labelUser)  labelUser.style.borderColor  = selected === 'USER'      ? '#34A853'          : 'var(--g-border)';
+    if (labelAdmin) labelAdmin.style.borderColor = selected === 'ADMIN'     ? 'var(--g-red)'          : 'var(--g-border)';
+    if (labelUser)  labelUser.style.borderColor  = selected === 'USER'      ? 'var(--g-green)'          : 'var(--g-border)';
 }
 
 async function loadUserDirectory() {
@@ -118,7 +139,7 @@ async function loadUserDirectory() {
                                     <div style="display:flex; align-items:center; gap:12px;">
                                         <div style="width:36px; height:36px; border-radius:50%; flex-shrink:0;
                                                     background:${u.role === 'ADMIN' ? '#FCE8E6' : '#E8F0FE'};
-                                                    color:${u.role === 'ADMIN' ? '#EA4335' : 'var(--g-blue)'};
+                                                    color:${u.role === 'ADMIN' ? 'var(--g-red)' : 'var(--g-blue)'};
                                                     display:flex; align-items:center; justify-content:center;
                                                     font-weight:600; font-size:14px;">
                                             ${u.username[0].toUpperCase()}
@@ -133,7 +154,7 @@ async function loadUserDirectory() {
                                     <span style="display:inline-flex; align-items:center; gap:4px; font-size:12px;
                                                  font-weight:600; padding:4px 10px; border-radius:100px;
                                                  background:${u.role === 'ADMIN' ? '#FCE8E6' : '#E8F0FE'};
-                                                 color:${u.role === 'ADMIN' ? '#EA4335' : 'var(--g-blue)'};">
+                                                 color:${u.role === 'ADMIN' ? 'var(--g-red)' : 'var(--g-blue)'};">
                                         ${u.role}
                                     </span>
                                 </td>
@@ -274,11 +295,11 @@ let secLogCurrentPage = 0;
 let secLogTotalPages  = 0;
 
 const SEC_EVENT_LABELS = {
-    LOGIN_SUCCESS:   { text: 'Login success',   color: '#34A853', bg: '#E6F4EA' },
-    LOGIN_FAILURE:   { text: 'Login failure',   color: '#EA4335', bg: '#FCE8E6' },
-    LOGIN_BLOCKED:   { text: 'Login blocked',   color: '#EA4335', bg: '#FCE8E6' },
-    LOGOUT:          { text: 'Logout',          color: '#5F6368', bg: '#F1F3F4' },
-    TOKEN_REFRESHED: { text: 'Token refreshed', color: '#1A73E8', bg: '#E8F0FE' }
+    LOGIN_SUCCESS:   { text: 'Login success',   color: 'var(--g-green)', bg: '#E6F4EA' },
+    LOGIN_FAILURE:   { text: 'Login failure',   color: 'var(--g-red)', bg: '#FCE8E6' },
+    LOGIN_BLOCKED:   { text: 'Login blocked',   color: 'var(--g-red)', bg: '#FCE8E6' },
+    LOGOUT:          { text: 'Logout',          color: 'var(--g-text-muted)', bg: '#F1F3F4' },
+    TOKEN_REFRESHED: { text: 'Token refreshed', color: 'var(--g-blue-dark)', bg: '#E8F0FE' }
 };
 
 function clearSecurityLogFilters() {
@@ -319,7 +340,7 @@ async function loadSecurityLog(page) {
             tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:32px;">No matching events.</td></tr>';
         } else {
             tbody.innerHTML = data.content.map(ev => {
-                const meta = SEC_EVENT_LABELS[ev.eventType] || { text: ev.eventType, color: '#5F6368', bg: '#F1F3F4' };
+                const meta = SEC_EVENT_LABELS[ev.eventType] || { text: ev.eventType, color: 'var(--g-text-muted)', bg: '#F1F3F4' };
                 return `
                     <tr>
                         <td><span style="display:inline-block; padding:3px 10px; border-radius:12px; font-size:12px; font-weight:500; color:${meta.color}; background:${meta.bg};">${meta.text}</span></td>

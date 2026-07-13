@@ -3,58 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Workspace - Ticketmaster</title>
+    <title>Workspace - TrackTicket</title>
 
     <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" href="/css/ticket-wizard.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" />
 
     <style>
+        /* Resilient type stack — guards against the external stylesheet not
+           defining these, or Google Fonts failing to load (falls through to
+           system fonts, then generic sans-serif, instead of browser-default serif). */
+        :root {
+            --font-display: 'Space Grotesk', 'Outfit', -apple-system, 'Segoe UI', Roboto, sans-serif;
+            --font-ui: 'Inter', -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
         /* Base Resets & Layout */
-        body { font-family: var(--font-ui); background-color: var(--g-background); color: var(--g-text-main); margin: 0; overflow: hidden; }
+        body { font-family: var(--font-ui); background-color: var(--tm-bg, #fff); color: var(--g-text-main); margin: 0; overflow: hidden; }
         .app-layout { display: flex; height: 100vh; overflow: hidden; }
 
-        /* Left Navigation Drawer */
+        /* Left Navigation Drawer — pale wash background, white main content;
+           the reverse of before, matching a calmer, "content is the star"
+           reference layout instead of a bright-white sidebar competing with it. */
         .md-nav-drawer {
-            width: 280px; background-color: var(--g-surface); padding: 24px 12px;
-            display: flex; flex-direction: column; gap: 8px; border-right: 1px solid var(--g-border); z-index: 10;
+            width: 272px; background-color: var(--g-background); padding: 20px 14px;
+            display: flex; flex-direction: column; gap: 2px; z-index: 10;
+            overflow-y: auto; overflow-x: hidden;
         }
+        /* Every row keeps its own natural height — without this, a long list
+           of nav items in a fixed-height flex column gets squeezed unevenly
+           by the flexbox algorithm instead of scrolling. */
+        .md-nav-drawer > * { flex-shrink: 0; }
+        .md-nav-drawer::-webkit-scrollbar { width: 6px; }
+        .md-nav-drawer::-webkit-scrollbar-thumb { background: var(--g-border); border-radius: 100px; }
+        .md-nav-drawer::-webkit-scrollbar-track { background: transparent; }
 
         .drawer-header {
-            padding: 8px 16px 32px 16px; display: flex; flex-direction: column; gap: 4px; border-bottom: 1px solid var(--g-border); margin-bottom: 16px;
+            padding: 10px 10px 20px; display: flex; flex-direction: column; gap: 4px;
         }
 
-        /* 5. Highlight Website Name */
         .drawer-title {
-            font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--g-text-main); letter-spacing: -0.2px; margin: 0;
-            display: flex; align-items: center; gap: 8px;
+            font-family: var(--font-display); font-size: 18px; font-weight: 700; color: var(--g-text-main); letter-spacing: -0.2px; margin: 0;
+            display: flex; align-items: center; gap: 10px;
         }
 
+        .drawer-collapse-btn {
+            width: 28px; height: 28px; border: none; background: transparent; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            color: var(--g-text-faint); border-radius: 50%; flex-shrink: 0; padding: 0;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+        .drawer-collapse-btn:hover { background: var(--g-border); color: var(--g-text-main); }
+
+        /* Flat, monochrome icons — a person's eye should land on what's
+           ACTIVE (one blue pill), not on eight different icon colors before
+           they've even decided where to look. Icons inherit .nav-item's
+           color entirely; no per-item background chip, no per-item hue. */
         .nav-item {
-            display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; border-radius: 24px;
-            cursor: pointer; color: var(--g-text-main); font-weight: 500; font-size: 14px; transition: background-color 0.2s;
+            display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 14px; border-radius: 12px;
+            cursor: pointer; color: var(--g-text-muted); font-weight: 500; font-size: 14px; transition: background-color 0.15s ease, color 0.15s ease;
         }
-        .nav-item:hover { background-color: #F1F3F4; }
-        .nav-item.active { background-color: var(--g-blue-light); color: var(--g-blue-dark); }
-        .nav-item.active .material-symbols-rounded { color: var(--g-blue-dark); }
+        .nav-item .material-symbols-rounded { font-size: 20px; color: inherit; flex-shrink: 0; }
+        .nav-item:hover { background-color: var(--g-border); color: var(--g-text-main); }
+        .nav-item.active { background-color: var(--g-surface); color: var(--g-blue-dark); font-weight: 600; box-shadow: 0 1px 3px rgba(3,4,94,0.08); }
 
-        /* 1. Global Create Button */
-        .nav-create-btn {
-            background-color: var(--g-surface); border: 1px solid var(--g-border); box-shadow: 0 1px 3px rgba(60,64,67,0.1);
-            color: var(--g-blue); margin-bottom: 24px; justify-content: center; font-weight: 600;
+        /* Section labels — flat, grouped nav sections instead of nested
+           expand/collapse accordions. Everything under a label is a direct,
+           always-visible destination; no clicks-to-reveal required. */
+        .nav-section-label {
+            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+            color: var(--g-text-faint, var(--g-text-muted));
+            padding: 22px 14px 8px;
         }
-        .nav-create-btn:hover { background-color: #F8F9FA; box-shadow: 0 2px 6px rgba(60,64,67,0.15); }
+        .md-nav-drawer.nav-collapsed .nav-section-label { display: none; }
+
+        /* Sub-items — indentation signals hierarchy instead of a smaller
+           colored icon square. */
+        .nav-sub-item { padding-left: 40px !important; height: 38px !important; font-size: 13.5px; }
+        .nav-sub-item .material-symbols-rounded { font-size: 16px; }
+
+        /* Primary CTA — a solid, unmistakable action button, not a bordered
+           white pill with a tiny colored plus-icon lost inside it. */
+        .nav-create-btn {
+            background-color: var(--g-blue-dark); color: #FFFFFF;
+            margin: 4px 0 20px; justify-content: center; font-weight: 600;
+            box-shadow: 0 2px 8px rgba(2,62,138,0.25);
+        }
+        .nav-create-btn .material-symbols-rounded { color: #FFFFFF; }
+        .nav-create-btn:hover { background-color: var(--tm-primary-dark, #03045e); color: #FFFFFF; }
 
         /* Main Workspace Area */
-        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; background-color: var(--g-background); }
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow-y: auto; background-color: var(--tm-bg, #fff); }
         .md-top-app-bar {
-            height: 64px; min-height: 64px; padding: 0 32px; display: flex; align-items: center; justify-content: space-between;
-            background: var(--g-surface); border-bottom: 1px solid var(--g-border); position: sticky; top: 0; z-index: 5;
+            height: 68px; min-height: 68px; padding: 0 40px; display: flex; align-items: center; justify-content: space-between;
+            background: var(--tm-bg, #fff); position: sticky; top: 0; z-index: 5;
         }
-        .view-title { font-family: var(--font-display); font-size: 20px; font-weight: 500; margin: 0; }
-        .md-workspace { padding: 32px; max-width: 1440px; margin: 0 auto; width: 100%; }
+        .view-title { font-family: var(--font-display); font-size: 20px; font-weight: 600; margin: 0; }
+        .md-workspace { padding: 8px 40px 40px; max-width: 1440px; margin: 0 auto; width: 100%; }
         .app-view { display: none; animation: fadeIn 0.4s ease; }
         .app-view.active-view { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -63,27 +111,27 @@
         .dashboard-header {
             margin-bottom: 32px;
         }
-        .dashboard-header h2 { font-family: var(--font-display); font-size: 32px; font-weight: 600; margin: 0 0 8px 0; letter-spacing: -0.5px; }
-        .dashboard-header p { margin: 0; color: var(--g-text-muted); font-size: 16px; }
+        .dashboard-header h2 { font-family: var(--font-display); font-size: 30px; font-weight: 700; margin: 0 0 6px 0; letter-spacing: -0.5px; }
+        .dashboard-header p { margin: 0; color: var(--g-text-muted); font-size: 15px; }
 
         /* Scorecard strip */
         .scorecard {
-            background: var(--g-surface); border-radius: 16px; border: 1px solid var(--g-border);
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.1);
+            background: var(--g-surface); border-radius: 20px; border: 1px solid var(--g-border);
+            box-shadow: 0 1px 3px 0 rgba(3, 4, 94,0.06);
             display: flex; margin-bottom: 24px;
         }
         .scorecard-cell {
-            flex: 1; padding: 24px 28px; display: flex; flex-direction: column; gap: 8px;
+            flex: 1; padding: 26px 28px; display: flex; flex-direction: column; gap: 10px;
             border-right: 1px solid var(--g-border);
         }
         .scorecard-cell:last-child { border-right: none; }
-        .metric-label { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; color: var(--g-text-muted); text-transform: uppercase; }
-        .metric-value { font-family: var(--font-display); font-size: 42px; font-weight: 400; line-height: 1; margin: 0; letter-spacing: -1px; }
+        .metric-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; color: var(--g-text-muted); text-transform: uppercase; }
+        .metric-value { font-family: var(--font-display); font-size: 40px; font-weight: 700; line-height: 1; margin: 0; letter-spacing: -1px; }
 
         /* Tabbed chart panel */
         .chart-panel {
-            background: var(--g-surface); border-radius: 16px; border: 1px solid var(--g-border);
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,0.1); overflow: hidden;
+            background: var(--g-surface); border-radius: 20px; border: 1px solid var(--g-border);
+            box-shadow: 0 1px 3px 0 rgba(3, 4, 94,0.06); overflow: hidden;
         }
         .chart-tabs {
             display: flex; border-bottom: 1px solid var(--g-border); padding: 0 24px; gap: 4px;
@@ -103,18 +151,47 @@
         }
 
         .search-bar {
+            position: relative;
             display: flex; align-items: center; background: var(--g-surface); border: 1px solid var(--g-border);
-            border-radius: 100px; padding: 8px 16px; width: 400px; box-shadow: 0 1px 3px rgba(60,64,67,0.05);
+            border-radius: 100px; padding: 8px 16px; width: 400px; box-shadow: 0 1px 3px rgba(3, 4, 94,0.05);
             transition: box-shadow 0.2s, border-color 0.2s;
         }
         .search-bar:focus-within { border-color: var(--g-blue); box-shadow: 0 2px 6px rgba(26,115,232,0.15); }
         .search-bar input { border: none; outline: none; background: transparent; width: 100%; font-family: var(--font-ui); font-size: 14px; margin-left: 8px; }
 
-        .data-table { width: 100%; border-collapse: collapse; background: var(--g-surface); border-radius: 12px; overflow: hidden; border: 1px solid var(--g-border); box-shadow: 0 1px 2px rgba(60,64,67,0.1); }
+        .search-suggest-panel {
+            display: none;
+            position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+            background: var(--g-surface); border: 1px solid var(--g-border);
+            border-radius: 12px; box-shadow: 0 12px 32px rgba(3,4,94,0.10);
+            padding: 6px; z-index: 20;
+        }
+        .search-suggest-panel.open { display: block; }
+        .search-suggest-label {
+            font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+            color: var(--g-text-faint); padding: 8px 10px 4px;
+        }
+        .search-suggest-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 8px 10px; border-radius: 8px; cursor: pointer;
+            font-size: 13.5px; color: var(--g-text-main);
+        }
+        .search-suggest-item:hover, .search-suggest-item.highlighted { background: var(--g-background); }
+        .search-suggest-item .material-symbols-rounded { font-size: 16px; color: var(--g-text-faint); }
+        .search-suggest-empty { padding: 14px 10px; font-size: 12.5px; color: var(--g-text-faint); text-align: center; }
+        .search-suggest-clear {
+            display: block; width: 100%; text-align: left;
+            padding: 8px 10px; margin-top: 2px; border-top: 1px solid var(--g-border);
+            font-size: 12px; color: var(--g-blue-dark); background: none; border: none;
+            cursor: pointer; font-family: var(--font-ui);
+        }
+        .search-suggest-clear:hover { text-decoration: underline; }
+
+        .data-table { width: 100%; border-collapse: collapse; background: var(--g-surface); border-radius: 12px; overflow: hidden; border: 1px solid var(--g-border); }
         .data-table th, .data-table td { padding: 16px 24px; text-align: left; border-bottom: 1px solid var(--g-border); font-size: 14px; }
-        .data-table th { background: #F8F9FA; color: var(--g-text-muted); font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
+        .data-table th { background: var(--g-background); color: var(--g-text-muted); font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 0.5px; }
         .data-table tr:last-child td { border-bottom: none; }
-        .data-table tbody tr:hover { background-color: #F8F9FA; }
+        .data-table tbody tr:hover { background-color: var(--g-background); }
 
         /* Chips */
         .ticket-chip { display: inline-flex; align-items: center; background-color: #F1F3F4; color: var(--g-text-main); border-radius: 100px; padding: 4px 10px; font-size: 12px; font-weight: 500; }
@@ -184,7 +261,7 @@
         .ai-chip {
             display: none;
             background: #E8F0FE;
-            color: #1A73E8;
+            color: var(--g-blue-dark);
             font-size: 11px;
             font-weight: 500;
             padding: 2px 10px;
@@ -263,7 +340,6 @@
         .md-nav-drawer { transition: width 0.25s ease, padding 0.25s ease; }
         .md-nav-drawer.nav-collapsed { width: 68px; padding: 16px 8px; overflow: hidden; }
         .md-nav-drawer.nav-collapsed .nav-label { display: none; }
-        .md-nav-drawer.nav-collapsed .drawer-subtitle { display: none; }
         .md-nav-drawer.nav-collapsed .nav-item { justify-content: center; padding: 0; width: 48px; margin: 0 auto; }
         .md-nav-drawer.nav-collapsed .nav-create-btn { width: 48px; height: 48px; border-radius: 50%; padding: 0; margin-bottom: 16px; }
         .md-nav-drawer.nav-collapsed .drawer-header { padding: 8px 0 16px 0; }
@@ -271,7 +347,11 @@
         .md-nav-drawer.nav-collapsed .drawer-title { justify-content: center; }
         .md-nav-drawer.nav-collapsed #navCollapseBtn { display: none; }
         .md-nav-drawer.nav-collapsed #navCollapseBtn .material-symbols-rounded { transform: rotate(180deg); }
-        .md-nav-drawer.nav-collapsed .nav-section-label { display: none; }
+        /* Match nav-item's collapsed centering exactly (same width + margin
+           approach) so the logo lines up with the icon column below it
+           instead of sitting slightly left of it. */
+        .md-nav-drawer.nav-collapsed .drawer-title { width: 48px; margin: 0 auto; gap: 0; justify-content: center; }
+        .md-nav-drawer.nav-collapsed .drawer-header > div { display: block; }
 
         /* Dialog centering — fixes modal appearing at top-left */
         dialog { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); margin: 0; }
@@ -296,13 +376,13 @@
         .toast {
             display: flex; align-items: center; gap: 12px;
             padding: 14px 18px; border-radius: 12px; min-width: 280px; max-width: 400px;
-            background: #202124; color: #fff; font-size: 13px; font-weight: 500;
+            background: var(--g-text-main); color: #fff; font-size: 13px; font-weight: 500;
             box-shadow: 0 8px 24px rgba(0,0,0,0.2);
             animation: toastIn 0.3s ease; pointer-events: auto;
             font-family: var(--font-ui);
         }
-        .toast.toast-success { background: #1E8E3E; }
-        .toast.toast-error   { background: #D93025; }
+        .toast.toast-success { background: var(--g-green); }
+        .toast.toast-error   { background: var(--g-red); }
         .toast.toast-warning { background: #B06000; }
         @keyframes toastIn {
             from { opacity: 0; transform: translateY(16px); }
@@ -337,8 +417,7 @@
         .stepper-label.breached { color: var(--g-red);   font-weight: 600; }
 
         /* Nav sub-items */
-        .nav-sub-item { padding-left: 20px !important; height: 40px !important; }
-        .nav-sub-chevron { transition: transform 0.2s; }
+        .nav-sub-chevron { font-size: 18px !important; margin-left: auto; transition: transform 0.2s; }
         .md-nav-drawer.nav-collapsed #consoleSubMenu { display: none !important; }
         .md-nav-drawer.nav-collapsed .nav-sub-chevron { display: none !important; }
     </style>
@@ -352,92 +431,109 @@
             <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                 <h2 class="drawer-title">
                     <img src="/images/logo.png" onclick="if(document.querySelector('.md-nav-drawer').classList.contains('nav-collapsed')) toggleNavCollapse()"
-                         style="width:28px; height:28px; object-fit:contain; flex-shrink:0; border-radius:6px; cursor:pointer;">
-                    <div class="nav-label">
-                        <div style="font-size:16px; font-weight:600; color:var(--g-text-main); line-height:1.2;">Ticketmaster</div>
-                        <div class="drawer-subtitle" style="font-size:11px; color:var(--g-text-muted); font-weight:400; letter-spacing:0.2px;">Enterprise Edition</div>
-                    </div>
+                         style="width:26px; height:26px; object-fit:contain; flex-shrink:0; border-radius:6px; cursor:pointer;">
+                    <span class="nav-label">TrackTicket</span>
                 </h2>
-                <button id="navCollapseBtn" onclick="toggleNavCollapse()" title="Collapse sidebar"
-                        style="width:28px; height:28px; border:none; background:transparent; cursor:pointer;
-                       display:flex; align-items:center; justify-content:center;
-                       color:var(--g-text-muted); border-radius:50%; flex-shrink:0; padding:0;">
+                <button id="navCollapseBtn" onclick="toggleNavCollapse()" title="Collapse sidebar" class="drawer-collapse-btn">
                     <span class="material-symbols-rounded" style="font-size:18px; transition:transform 0.25s;">chevron_left</span>
                 </button>
             </div>
         </div>
 
-        <div class="nav-item nav-create-btn" onclick="document.getElementById('createModal').showModal()">
-    <span style="display:flex; width:28px; height:28px; border-radius:8px; background:#E8F0FE;
-                 align-items:center; justify-content:center; flex-shrink:0;">
-        <span class="material-symbols-rounded" style="font-size:18px; color:var(--g-blue);">add</span>
-    </span>
+        <div class="nav-item nav-create-btn" onclick="openCreateModal()">
+            <span class="material-symbols-rounded" aria-hidden="true">add</span>
             <span class="nav-label">Raise New Incident</span>
         </div>
 
         <div class="nav-item active" onclick="switchView('viewDashboard', this)">
-            <span style="display:flex; width:28px; height:28px; border-radius:8px; background:#E8F0FE;
-                         align-items:center; justify-content:center; flex-shrink:0;">
-                <span class="material-symbols-rounded" style="font-size:18px; color:#4285F4;">space_dashboard</span>
-            </span>
+            <span class="material-symbols-rounded" aria-hidden="true">space_dashboard</span>
             <span class="nav-label">Dashboard Overview</span>
         </div>
 
+        <div class="nav-section-label">Workspace</div>
+
         <div id="consoleNavGroup">
-            <div class="nav-item" id="consoleNavParent" onclick="switchView('viewConsole', this)">
-        <span style="display:flex; width:28px; height:28px; border-radius:8px; background:#FEF7E0;
-                     align-items:center; justify-content:center; flex-shrink:0;">
-            <span class="material-symbols-rounded" style="font-size:18px; color:#F9AB00;">view_list</span>
-        </span>
+            <div class="nav-item" id="consoleNavParent" onclick="handleConsoleNavClick(this)">
+                <span class="material-symbols-rounded" aria-hidden="true">view_list</span>
                 <span class="nav-label">Operations Console</span>
-                <span class="material-symbols-rounded nav-label nav-sub-chevron" id="consoleSubChevron"
-                      style="font-size:16px; color:var(--g-text-muted); margin-left:auto;">expand_more</span>
+                <span class="material-symbols-rounded nav-label nav-sub-chevron" id="consoleSubChevron">expand_more</span>
             </div>
             <!-- Sub-items: visible to DEVELOPER/ADMIN when console is active -->
             <div id="consoleSubMenu" style="display:none;">
                 <div class="nav-item nav-sub-item" id="subFilterAssigned"
                      onclick="applyNavQuickFilter('assignedToMe')">
-            <span style="display:flex; width:22px; height:22px; border-radius:6px; background:#E8F0FE;
-                         align-items:center; justify-content:center; flex-shrink:0;">
-                <span class="material-symbols-rounded" style="font-size:14px; color:var(--g-blue);">person</span>
-            </span>
-                    <span class="nav-label" style="font-size:13px;">Assigned to me</span>
+                    <span class="material-symbols-rounded" aria-hidden="true">person</span>
+                    <span class="nav-label">Assigned to me</span>
                 </div>
                 <div class="nav-item nav-sub-item" id="subFilterRaised"
                      onclick="applyNavQuickFilter('raisedByMe')">
-            <span style="display:flex; width:22px; height:22px; border-radius:6px; background:#FEF7E0;
-                         align-items:center; justify-content:center; flex-shrink:0;">
-                <span class="material-symbols-rounded" style="font-size:14px; color:#B06000;">edit</span>
-            </span>
-                    <span class="nav-label" style="font-size:13px;">Raised by me</span>
+                    <span class="material-symbols-rounded" aria-hidden="true">edit</span>
+                    <span class="nav-label">Raised by me</span>
                 </div>
             </div>
         </div>
 
         <div class="nav-item" id="reportsNavItem" style="display:none;" onclick="switchView('viewReports', this)">
-            <span style="display:flex; width:28px; height:28px; border-radius:8px; background:#E6F4EA;
-                         align-items:center; justify-content:center; flex-shrink:0;">
-                <span class="material-symbols-rounded" style="font-size:18px; color:#34A853;">bar_chart</span>
-            </span>
+            <span class="material-symbols-rounded" aria-hidden="true">bar_chart</span>
             <span class="nav-label">Reports</span>
         </div>
 
         <!-- My Requests — visible to USER role only -->
         <div class="nav-item" id="myRequestsNavItem" style="display:none;"
              onclick="switchView('viewConsole', this); setMyRequestsMode()">
-                <span style="display:flex; width:28px; height:28px; border-radius:8px; background:#E6F4EA;
-                             align-items:center; justify-content:center; flex-shrink:0;">
-                    <span class="material-symbols-rounded" style="font-size:18px; color:#34A853;">inbox</span>
-                </span>
+            <span class="material-symbols-rounded" aria-hidden="true">inbox</span>
             <span class="nav-label">My Requests</span>
         </div>
 
-        <div class="nav-item" id="accessMgmtNavItem" style="display:none;" onclick="switchView('viewSettings', this)">
-            <span style="display:flex; width:28px; height:28px; border-radius:8px; background:#FCE8E6;
-                 align-items:center; justify-content:center; flex-shrink:0;">
-                <span class="material-symbols-rounded" style="font-size:18px; color:#EA4335;">shield_person</span>
-            </span>
-            <span class="nav-label">Access Management</span>
+        <!-- Ticket Operations — flat list, always visible once revealed for -->
+        <!-- ADMIN, instead of an accordion that has to be expanded first. -->
+        <div id="ticketOpsNavGroup" style="display:none;">
+            <div class="nav-section-label">Ticket Operations</div>
+            <div class="nav-item" onclick="switchView('viewSettings', this, 'tabSla')">
+                <span class="material-symbols-rounded" aria-hidden="true">timer</span>
+                <span class="nav-label">SLA Settings</span>
+            </div>
+            <div class="nav-item" onclick="switchView('viewSettings', this, 'tabRouting')">
+                <span class="material-symbols-rounded" aria-hidden="true">route</span>
+                <span class="nav-label">Categories &amp; Routing</span>
+            </div>
+            <div class="nav-item" onclick="switchView('viewSettings', this, 'tabCanned')">
+                <span class="material-symbols-rounded" aria-hidden="true">forum</span>
+                <span class="nav-label">Canned Responses</span>
+            </div>
+            <div class="nav-item" onclick="switchView('viewSettings', this, 'tabKb')">
+                <span class="material-symbols-rounded" aria-hidden="true">auto_stories</span>
+                <span class="nav-label">Knowledge Base</span>
+            </div>
+            <div class="nav-item" onclick="switchView('viewSettings', this, 'tabWebhooks')">
+                <span class="material-symbols-rounded" aria-hidden="true">webhook</span>
+                <span class="nav-label">Webhooks</span>
+            </div>
+        </div>
+
+        <!-- Identity & Access — same flat treatment -->
+        <div id="identityAccessNavGroup" style="display:none;">
+            <div class="nav-section-label">Identity &amp; Access</div>
+            <div class="nav-item" onclick="switchView('viewSettings', this, 'tabUsers')">
+                <span class="material-symbols-rounded" aria-hidden="true">group</span>
+                <span class="nav-label">User Directory</span>
+            </div>
+            <div class="nav-item" onclick="switchView('viewSettings', this, 'tabRegister')">
+                <span class="material-symbols-rounded" aria-hidden="true">person_add</span>
+                <span class="nav-label">Register User</span>
+            </div>
+            <div class="nav-item" id="navItemPasswordRequests" onclick="switchView('viewSettings', this, 'tabRequests')">
+                <span class="material-symbols-rounded" aria-hidden="true">lock_reset</span>
+                <span class="nav-label">Password Requests</span>
+            </div>
+            <div class="nav-item" onclick="switchView('viewSettings', this, 'tabSecurity')">
+                <span class="material-symbols-rounded" aria-hidden="true">history_edu</span>
+                <span class="nav-label">Security Log</span>
+            </div>
+            <div class="nav-item" onclick="switchView('viewSettings', this, 'tabMfa')">
+                <span class="material-symbols-rounded" aria-hidden="true">verified_user</span>
+                <span class="nav-label">Two-Factor Auth</span>
+            </div>
         </div>
 
     </aside>
@@ -486,7 +582,8 @@
             <!-- Notification Panel Dropdown -->
             <div id="notifPanel" style="display: none; position: absolute; top: 56px; right: 24px; width: 380px;
                  background: var(--g-surface); border: 1px solid var(--g-border); border-radius: 12px;
-                 box-shadow: 0 8px 32px rgba(0,0,0,0.12); z-index: 999; overflow: hidden;">
+                 box-shadow: 0 8px 32px rgba(3, 4, 94, 0.16); z-index: 999; overflow: hidden;"
+                 role="region" aria-label="Notifications">
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px 12px; border-bottom: 1px solid var(--g-border);">
                     <span style="font-weight: 600; font-size: 15px; font-family: var(--font-display);">Notifications</span>
                     <button onclick="markAllNotificationsRead()" class="g-btn g-btn-text"
@@ -502,8 +599,8 @@
 
             <div id="viewDashboard" class="app-view active-view">
                 <div class="dashboard-header">
-                    <h2>Platform Telemetry</h2>
-                    <p>Real-time insights into system health and agent resolution velocity.</p>
+                    <h2 id="dashboardGreeting">Hello 👋</h2>
+                    <p>Here's what's happening with your tickets today.</p>
                 </div>
 
                 <!-- Scorecard Strip — all 4 KPIs in one horizontal card -->
@@ -511,35 +608,35 @@
                     <div class="scorecard-cell">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <span class="metric-label">Total Fleet</span>
-                            <span class="material-symbols-rounded" style="font-size:18px; color:var(--g-blue);">dns</span>
+                            <span class="material-symbols-rounded" style="font-size:18px; color:var(--viz-blue);">dns</span>
                         </div>
-                        <h1 class="metric-value" style="color:var(--g-blue);" id="metricTotal">0</h1>
+                        <h1 class="metric-value" style="color:var(--viz-blue);" id="metricTotal">0</h1>
                     </div>
 
                     <div class="scorecard-cell">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <span class="metric-label">Active Backlog</span>
-                            <span class="material-symbols-rounded" style="font-size:18px; color:var(--g-red);">warning</span>
+                            <span class="material-symbols-rounded" style="font-size:18px; color:var(--viz-orange);">warning</span>
                         </div>
-                        <h1 class="metric-value" style="color:var(--g-red);" id="metricOpen">0</h1>
+                        <h1 class="metric-value" style="color:var(--viz-orange);" id="metricOpen">0</h1>
                     </div>
 
                     <div class="scorecard-cell">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <span class="metric-label">Resolved</span>
-                            <span class="material-symbols-rounded" style="font-size:18px; color:var(--g-green);">check_circle</span>
+                            <span class="material-symbols-rounded" style="font-size:18px; color:var(--viz-green);">check_circle</span>
                         </div>
-                        <h1 class="metric-value" style="color:var(--g-green);" id="metricResolved">0</h1>
+                        <h1 class="metric-value" style="color:var(--viz-green);" id="metricResolved">0</h1>
                     </div>
 
                     <div class="scorecard-cell">
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <span class="metric-label">SLA Compliance</span>
-                            <span class="material-symbols-rounded" style="font-size:18px; color:var(--g-yellow);">timer</span>
+                            <span class="material-symbols-rounded" style="font-size:18px; color:var(--viz-purple);" id="metricSlaIcon">timer</span>
                         </div>
-                        <h1 class="metric-value" id="metricSla" style="color:var(--g-yellow);">—</h1>
+                        <h1 class="metric-value" id="metricSla" style="color:var(--viz-purple);">—</h1>
                         <div style="height:3px; background:var(--g-border); border-radius:2px; margin-top:4px;">
-                            <div id="slaProgressBar" style="height:100%; border-radius:2px; width:0%; transition:width 0.6s ease; background:var(--g-yellow);"></div>
+                            <div id="slaProgressBar" style="height:100%; border-radius:2px; width:0%; transition:width 0.6s ease; background:var(--viz-purple);"></div>
                         </div>
                     </div>
                 </div>
@@ -610,7 +707,10 @@
                         </select>
                         <div class="search-bar">
                             <span class="material-symbols-rounded" style="color: var(--g-text-muted); font-size: 20px;">search</span>
-                            <input type="text" id="ticketSearch" placeholder="Search by Ticket ID, Title, or Assignee..." onkeyup="filterTickets()">
+                            <input type="text" id="ticketSearch" placeholder="Search by Ticket ID, Title, or Assignee..."
+                                   onkeyup="filterTickets()" onfocus="showSearchSuggestions()"
+                                   autocomplete="off" aria-expanded="false" aria-controls="searchSuggestPanel">
+                            <div class="search-suggest-panel" id="searchSuggestPanel"></div>
                         </div>
                     </div>
                 </div>
@@ -701,26 +801,27 @@
                     </div>
                 </div>
 
-                <table class="data-table">
-                    <thead>
-                    <tr>
-                        <th style="width: 40px;">
-                            <input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)"
-                                   style="width:16px; height:16px; cursor:pointer;">
-                        </th>
-                        <th style="width: 80px;">ID</th>
-                        <th>Subject Summary</th>
-                        <th style="width: 120px;">Category</th>
-                        <th style="width: 120px;">Priority</th>
-                        <th style="width: 140px;">Status</th>
-                        <th style="width: 160px;">SLA Deadline</th>
-                        <th style="width: 100px; text-align: right;">Action</th>
-                    </tr>
-                    </thead>
-                    <tbody id="ticketTableBody">
-                    </tbody>
-                </table>
-                </table>
+                <div style="overflow-x:auto;">
+                    <table class="data-table">
+                        <thead>
+                        <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll(this)"
+                                       style="width:16px; height:16px; cursor:pointer;">
+                            </th>
+                            <th style="width: 80px;">ID</th>
+                            <th>Subject Summary</th>
+                            <th style="width: 120px;">Category</th>
+                            <th style="width: 120px;">Priority</th>
+                            <th style="width: 140px;">Status</th>
+                            <th style="width: 160px;">SLA Deadline</th>
+                            <th style="width: 100px; text-align: right;">Action</th>
+                        </tr>
+                        </thead>
+                        <tbody id="ticketTableBody">
+                        </tbody>
+                    </table>
+                </div>
 
                 <div id="consolePagination" style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; padding: 0 4px;">
                     <span id="paginationInfo" style="font-size:13px; color:var(--g-text-muted);"></span>
@@ -735,12 +836,18 @@
 
             <div id="viewSettings" class="app-view">
                 <div class="dashboard-header">
-                    <h2>Access Management</h2>
-                    <p>Manage users, roles, and security across the Ticketmaster network.</p>
+                    <!-- No on-page <h2> here on purpose: the top bar already shows -->
+                    <!-- this exact page name, so repeating it as a big heading right -->
+                    <!-- below was a plain duplicate. The subtitle adds real information -->
+                    <!-- the top bar doesn't (what this page is actually for). -->
+                    <h2 id="settingsPageTitle" class="sr-only">User Directory</h2>
+                    <p id="settingsPageSubtitle" style="font-size:15px; color:var(--g-text-muted); margin:0;">See and manage everyone with access to TrackTicket.</p>
                 </div>
 
-                <!-- Stats row -->
-                <div style="display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap;">
+                <!-- Stats row — only relevant to the Identity & Access tabs; -->
+                <!-- hidden entirely for Ticket Operations tabs where these -->
+                <!-- four numbers have nothing to do with what's on screen. -->
+                <div id="settingsStatsRow" style="display:flex; gap:16px; margin-bottom:24px; flex-wrap:wrap;">
                     <div style="flex:1; min-width:140px; background:var(--g-surface); border:1px solid var(--g-border);
                     border-radius:12px; padding:20px 24px;">
                         <div class="metric-label">Total Users</div>
@@ -749,486 +856,440 @@
                     <div style="flex:1; min-width:140px; background:var(--g-surface); border:1px solid var(--g-border);
                     border-radius:12px; padding:20px 24px;">
                         <div class="metric-label">Administrators</div>
-                        <div class="metric-value" id="statAdmins" style="font-size:28px; color:#EA4335;">—</div>
+                        <div class="metric-value" id="statAdmins" style="font-size:28px; color:var(--g-red);">—</div>
                     </div>
                     <div style="flex:1; min-width:140px; background:var(--g-surface); border:1px solid var(--g-border);
                     border-radius:12px; padding:20px 24px;">
                         <div class="metric-label">Developers</div>
-                        <div class="metric-value" id="statDevs" style="font-size:28px; color:#34A853;">—</div>
+                        <div class="metric-value" id="statDevs" style="font-size:28px; color:var(--g-green);">—</div>
                     </div>
                     <div style="flex:1; min-width:140px; background:var(--g-surface); border:1px solid var(--g-border);
                     border-radius:12px; padding:20px 24px; cursor:pointer;"
-                         onclick="switchSettingsTab('tabRequests')">
+                         onclick="switchView('viewSettings', document.getElementById('navItemPasswordRequests'), 'tabRequests')">
                         <div class="metric-label">Password Requests</div>
-                        <div class="metric-value" id="statRequests" style="font-size:28px; color:#F9AB00;">—</div>
+                        <div class="metric-value" id="statRequests" style="font-size:28px; color:var(--g-yellow);">—</div>
                     </div>
                 </div>
 
-                <!-- Tab bar -->
-                <div style="display:flex; gap:4px; border-bottom:1px solid var(--g-border); margin-bottom:24px;">
-                    <button id="settingsTab-tabUsers" onclick="switchSettingsTab('tabUsers')"
-                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
-                       cursor:pointer; border-bottom:3px solid var(--g-blue); color:var(--g-blue);
-                       margin-bottom:-1px; font-family:var(--font-ui);">
-                        User Directory
-                    </button>
-                    <button id="settingsTab-tabRegister" onclick="switchSettingsTab('tabRegister')"
-                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
-                       cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
-                       margin-bottom:-1px; font-family:var(--font-ui);">
-                        Register User
-                    </button>
-                    <button id="settingsTab-tabRequests" onclick="switchSettingsTab('tabRequests')"
-                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
-                       cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
-                       margin-bottom:-1px; font-family:var(--font-ui);">
-                        Password Requests
-                    </button>
-                    <button id="settingsTab-tabSecurity" onclick="switchSettingsTab('tabSecurity')"
-                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
-                       cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
-                       margin-bottom:-1px; font-family:var(--font-ui);">
-                        Security Log
-                    </button>
-                    <button id="settingsTab-tabSla" onclick="switchSettingsTab('tabSla')"
-                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
-                       cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
-                       margin-bottom:-1px; font-family:var(--font-ui);">
-                        SLA Settings
-                    </button>
-                    <button id="settingsTab-tabRouting" onclick="switchSettingsTab('tabRouting')"
-                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
-                       cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
-                       margin-bottom:-1px; font-family:var(--font-ui);">
-                        Categories &amp; Routing
-                    </button>
-                    <button id="settingsTab-tabCanned" onclick="switchSettingsTab('tabCanned')"
-                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
-                               cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
-                               margin-bottom:-1px; font-family:var(--font-ui);">
-                        Canned Responses
-                    </button>
-                    <button id="settingsTab-tabKb" onclick="switchSettingsTab('tabKb')"
-                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
-                               cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
-                               margin-bottom:-1px; font-family:var(--font-ui);">
-                        Knowledge Base
-                    </button>
-                    <button id="settingsTab-tabWebhooks" onclick="switchSettingsTab('tabWebhooks')"
-                            style="padding:10px 20px; font-size:13px; font-weight:500; border:none; background:transparent;
-                               cursor:pointer; border-bottom:3px solid transparent; color:var(--g-text-muted);
-                               margin-bottom:-1px; font-family:var(--font-ui);">
-                        Webhooks
-                    </button>
-                </div>
+                <!-- Panel content lives in one card; navigation itself now -->
+                <!-- lives only in the sidebar, so it isn't duplicated here too. -->
+                <div class="settings-panel-card">
 
-                <!-- Tab: User Directory -->
-                <div id="settingsPanel-tabUsers">
-                    <div id="userDirectoryList">
-                        <p style="color:var(--g-text-muted); font-size:13px;">Loading users...</p>
+                    <!-- Tab: User Directory -->
+                    <div id="settingsPanel-tabUsers">
+                        <div id="userDirectoryList">
+                            <p style="color:var(--g-text-muted); font-size:13px;">Loading users...</p>
+                        </div>
                     </div>
-                </div>
 
-                <!-- Tab: Register User -->
-                <div id="settingsPanel-tabRegister" style="display:none;">
-                    <div style="max-width:520px; background:var(--g-surface); border:1px solid var(--g-border);
+                    <!-- Tab: Register User -->
+                    <div id="settingsPanel-tabRegister" style="display:none;">
+                        <div style="max-width:520px; background:var(--g-surface); border:1px solid var(--g-border);
                     border-radius:16px; padding:32px;">
-                        <h3 style="margin:0 0 6px 0; font-family:var(--font-display); font-size:18px;">Register New User</h3>
-                        <p style="margin:0 0 24px 0; font-size:13px; color:var(--g-text-muted);">
-                            Create a new account and assign a role. The user will log in with these credentials.
-                        </p>
+                            <h3 style="margin:0 0 6px 0; font-family:var(--font-display); font-size:18px;">Register New User</h3>
+                            <p style="margin:0 0 24px 0; font-size:13px; color:var(--g-text-muted);">
+                                Create a new account and assign a role. The user will log in with these credentials.
+                            </p>
 
-                        <div id="adminMsg" style="display:none; padding:12px 16px; border-radius:8px;
+                            <div id="adminMsg" style="display:none; padding:12px 16px; border-radius:8px;
                                       margin-bottom:20px; font-size:13px; font-weight:500;"></div>
 
-                        <div class="g-input-group">
-                            <input type="text" id="regUser" placeholder=" ">
-                            <label for="regUser">Username</label>
-                        </div>
-                        <div class="g-input-group">
-                            <input type="email" id="regEmail" placeholder=" ">
-                            <label for="regEmail">Email Address</label>
-                        </div>
-                        <div class="g-input-group">
-                            <input type="password" id="regPass" placeholder=" ">
-                            <label for="regPass">Password</label>
-                        </div>
-                        <div class="g-input-group" id="mfaCodeGroup" style="display:none; margin-bottom: 8px;">
-                            <input type="text" id="mfaCode" placeholder=" " maxlength="6" autocomplete="off">
-                            <label for="mfaCode">6-digit authenticator code</label>
-                        </div>
-                        <div style="margin-bottom:24px;">
-                            <p style="font-size:12px; color:var(--g-text-muted); margin:0 0 16px 0; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Assign Role</p>
-                            <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                                <label style="flex:1; min-width:140px; display:flex; align-items:center; gap:12px; padding:16px;
+                            <div class="g-input-group">
+                                <input type="text" id="regUser" placeholder=" ">
+                                <label for="regUser">Username</label>
+                            </div>
+                            <div class="g-input-group">
+                                <input type="email" id="regEmail" placeholder=" ">
+                                <label for="regEmail">Email Address</label>
+                            </div>
+                            <div class="g-input-group">
+                                <input type="password" id="regPass" placeholder=" ">
+                                <label for="regPass">Password</label>
+                            </div>
+                            <div class="g-input-group" id="mfaCodeGroup" style="display:none; margin-bottom: 8px;">
+                                <input type="text" id="mfaCode" placeholder=" " maxlength="6" autocomplete="off">
+                                <label for="mfaCode">6-digit authenticator code</label>
+                            </div>
+                            <div style="margin-bottom:24px;">
+                                <p style="font-size:12px; color:var(--g-text-muted); margin:0 0 16px 0; font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Assign Role</p>
+                                <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                                    <label style="flex:1; min-width:140px; display:flex; align-items:center; gap:12px; padding:16px;
                                       border:2px solid var(--g-border); border-radius:12px; cursor:pointer;
                                       transition:border-color 0.15s;" id="roleLabelDev">
-                                    <input type="radio" name="regRole" id="regRoleDev" value="DEVELOPER"
-                                           onchange="updateRoleSelection()" checked
-                                           style="width:16px; height:16px; accent-color:var(--g-blue);">
-                                    <div>
-                                        <div style="font-weight:600; font-size:14px; color:var(--g-text-main);">Developer</div>
-                                        <div style="font-size:12px; color:var(--g-text-muted);">Agent — resolves tickets</div>
-                                    </div>
-                                </label>
-                                <label style="flex:1; min-width:140px; display:flex; align-items:center; gap:12px; padding:16px;
+                                        <input type="radio" name="regRole" id="regRoleDev" value="DEVELOPER"
+                                               onchange="updateRoleSelection()" checked
+                                               style="width:16px; height:16px; accent-color:var(--g-blue);">
+                                        <div>
+                                            <div style="font-weight:600; font-size:14px; color:var(--g-text-main);">Developer</div>
+                                            <div style="font-size:12px; color:var(--g-text-muted);">Agent — resolves tickets</div>
+                                        </div>
+                                    </label>
+                                    <label style="flex:1; min-width:140px; display:flex; align-items:center; gap:12px; padding:16px;
                                       border:2px solid var(--g-border); border-radius:12px; cursor:pointer;
                                       transition:border-color 0.15s;" id="roleLabelAdmin">
-                                    <input type="radio" name="regRole" id="regRoleAdmin" value="ADMIN"
-                                           onchange="updateRoleSelection()"
-                                           style="width:16px; height:16px; accent-color:#EA4335;">
-                                    <div>
-                                        <div style="font-weight:600; font-size:14px; color:var(--g-text-main);">Admin</div>
-                                        <div style="font-size:12px; color:var(--g-text-muted);">Full system access</div>
-                                    </div>
-                                </label>
-                                <label style="flex:1; min-width:140px; display:flex; align-items:center; gap:12px; padding:16px;
+                                        <input type="radio" name="regRole" id="regRoleAdmin" value="ADMIN"
+                                               onchange="updateRoleSelection()"
+                                               style="width:16px; height:16px; accent-color:var(--g-red);">
+                                        <div>
+                                            <div style="font-weight:600; font-size:14px; color:var(--g-text-main);">Admin</div>
+                                            <div style="font-size:12px; color:var(--g-text-muted);">Full system access</div>
+                                        </div>
+                                    </label>
+                                    <label style="flex:1; min-width:140px; display:flex; align-items:center; gap:12px; padding:16px;
                                       border:2px solid var(--g-border); border-radius:12px; cursor:pointer;
                                       transition:border-color 0.15s;" id="roleLabelUser">
-                                    <input type="radio" name="regRole" id="regRoleUser" value="USER"
-                                           onchange="updateRoleSelection()"
-                                           style="width:16px; height:16px; accent-color:#34A853;">
-                                    <div>
-                                        <div style="font-weight:600; font-size:14px; color:var(--g-text-main);">User</div>
-                                        <div style="font-size:12px; color:var(--g-text-muted);">Requester — raises tickets only</div>
-                                    </div>
-                                </label>
+                                        <input type="radio" name="regRole" id="regRoleUser" value="USER"
+                                               onchange="updateRoleSelection()"
+                                               style="width:16px; height:16px; accent-color:var(--g-green);">
+                                        <div>
+                                            <div style="font-weight:600; font-size:14px; color:var(--g-text-main);">User</div>
+                                            <div style="font-size:12px; color:var(--g-text-muted);">Requester — raises tickets only</div>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <button class="g-btn g-btn-primary" style="width:100%; height:44px; font-size:14px;"
+                                    onclick="adminRegisterUser()">Create Account</button>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Password Requests -->
+                    <div id="settingsPanel-tabRequests" style="display:none;">
+                        <div id="passwordRequestsList">
+                            <p style="color:var(--g-text-muted); font-size:13px;">Loading requests...</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Security Log -->
+                    <div id="settingsPanel-tabSecurity" style="display:none;">
+                        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:20px;">
+                            <div style="min-width:160px;">
+                                <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">Event Type</label>
+                                <select id="secLogEventType" onchange="loadSecurityLog(0)"
+                                        style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                                    <option value="">All events</option>
+                                    <option value="LOGIN_SUCCESS">Login success</option>
+                                    <option value="LOGIN_FAILURE">Login failure</option>
+                                    <option value="LOGIN_BLOCKED">Login blocked</option>
+                                    <option value="LOGOUT">Logout</option>
+                                    <option value="TOKEN_REFRESHED">Token refreshed</option>
+                                </select>
+                            </div>
+                            <div style="min-width:160px;">
+                                <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">Username</label>
+                                <input type="text" id="secLogUsername" placeholder="Filter by username"
+                                       onkeydown="if(event.key==='Enter') loadSecurityLog(0)"
+                                       style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui); box-sizing:border-box;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">From</label>
+                                <input type="date" id="secLogFrom" onchange="loadSecurityLog(0)"
+                                       style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">To</label>
+                                <input type="date" id="secLogTo" onchange="loadSecurityLog(0)"
+                                       style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                            </div>
+                            <button class="g-btn" onclick="clearSecurityLogFilters()"
+                                    style="padding:8px 16px; font-size:13px;">Clear</button>
+                        </div>
+
+                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; overflow-x:auto;">
+                            <table class="data-table">
+                                <thead>
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Username</th>
+                                    <th>IP Address</th>
+                                    <th>Detail</th>
+                                    <th>Occurred At</th>
+                                </tr>
+                                </thead>
+                                <tbody id="secLogBody">
+                                <tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:32px;">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
+                            <span id="secLogPageInfo" style="font-size:12px; color:var(--g-text-muted);"></span>
+                            <div style="display:flex; gap:8px;">
+                                <button class="g-btn" id="secLogPrevBtn" onclick="loadSecurityLog(secLogCurrentPage - 1)" style="padding:6px 14px; font-size:13px;">Previous</button>
+                                <button class="g-btn" id="secLogNextBtn" onclick="loadSecurityLog(secLogCurrentPage + 1)" style="padding:6px 14px; font-size:13px;">Next</button>
                             </div>
                         </div>
-
-                        <button class="g-btn g-btn-primary" style="width:100%; height:44px; font-size:14px;"
-                                onclick="adminRegisterUser()">Create Account</button>
-                    </div>
-                </div>
-
-                <!-- Tab: Password Requests -->
-                <div id="settingsPanel-tabRequests" style="display:none;">
-                    <div id="passwordRequestsList">
-                        <p style="color:var(--g-text-muted); font-size:13px;">Loading requests...</p>
-                    </div>
-                </div>
-
-                <!-- Tab: Security Log -->
-                <div id="settingsPanel-tabSecurity" style="display:none;">
-                    <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:20px;">
-                        <div style="min-width:160px;">
-                            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">Event Type</label>
-                            <select id="secLogEventType" onchange="loadSecurityLog(0)"
-                                    style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
-                                <option value="">All events</option>
-                                <option value="LOGIN_SUCCESS">Login success</option>
-                                <option value="LOGIN_FAILURE">Login failure</option>
-                                <option value="LOGIN_BLOCKED">Login blocked</option>
-                                <option value="LOGOUT">Logout</option>
-                                <option value="TOKEN_REFRESHED">Token refreshed</option>
-                            </select>
-                        </div>
-                        <div style="min-width:160px;">
-                            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">Username</label>
-                            <input type="text" id="secLogUsername" placeholder="Filter by username"
-                                   onkeydown="if(event.key==='Enter') loadSecurityLog(0)"
-                                   style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui); box-sizing:border-box;">
-                        </div>
-                        <div>
-                            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">From</label>
-                            <input type="date" id="secLogFrom" onchange="loadSecurityLog(0)"
-                                   style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
-                        </div>
-                        <div>
-                            <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">To</label>
-                            <input type="date" id="secLogTo" onchange="loadSecurityLog(0)"
-                                   style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
-                        </div>
-                            <button class="g-btn" onclick="clearSecurityLogFilters()"
-                                style="padding:8px 16px; font-size:13px;">Clear</button>
                     </div>
 
-                    <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; overflow:hidden;">
-                        <table class="data-table">
-                            <thead>
-                            <tr>
-                                <th>Event</th>
-                                <th>Username</th>
-                                <th>IP Address</th>
-                                <th>Detail</th>
-                                <th>Occurred At</th>
-                            </tr>
-                            </thead>
-                            <tbody id="secLogBody">
-                            <tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:32px;">Loading...</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px; margin-top:20px;">
-                        <h3 style="margin:0 0 12px 0; font-family:var(--font-display); font-size:16px;">Two-Factor Authentication</h3>
-                        <div id="mfaStatusView"></div>
-                    </div>
-
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px;">
-                        <span id="secLogPageInfo" style="font-size:12px; color:var(--g-text-muted);"></span>
-                        <div style="display:flex; gap:8px;">
-                            <button class="g-btn" id="secLogPrevBtn" onclick="loadSecurityLog(secLogCurrentPage - 1)" style="padding:6px 14px; font-size:13px;">Previous</button>
-                            <button class="g-btn" id="secLogNextBtn" onclick="loadSecurityLog(secLogCurrentPage + 1)" style="padding:6px 14px; font-size:13px;">Next</button>
+                    <!-- Tab: Two-Factor Authentication — its own destination now, -->
+                    <!-- instead of being tacked onto the bottom of Security Log. -->
+                    <div id="settingsPanel-tabMfa" style="display:none;">
+                        <div style="max-width:560px; background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:32px;">
+                            <h3 style="margin:0 0 6px 0; font-family:var(--font-display); font-size:18px;">Two-Factor Authentication</h3>
+                            <p style="margin:0 0 20px 0; font-size:13px; color:var(--g-text-muted);">
+                                Require a 6-digit authenticator code (Google Authenticator, Authy, etc.) in addition to your password at sign-in.
+                            </p>
+                            <div id="mfaStatusView"></div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Tab: SLA Settings -->
-                <div id="settingsPanel-tabSla" style="display:none;">
-                    <div style="max-width:560px; background:var(--g-surface); border:1px solid var(--g-border);
+                    <!-- Tab: SLA Settings -->
+                    <div id="settingsPanel-tabSla" style="display:none;">
+                        <div style="max-width:560px; background:var(--g-surface); border:1px solid var(--g-border);
                     border-radius:16px; padding:32px;">
-                        <h3 style="margin:0 0 6px 0; font-family:var(--font-display); font-size:18px;">SLA Response Windows</h3>
-                        <p style="margin:0 0 24px 0; font-size:13px; color:var(--g-text-muted);">
-                            How much time agents have to resolve a ticket before it's considered breached, by priority.
-                            Changes apply to new tickets and to the SLA warning/critical checks going forward —
-                            due dates already set on existing tickets are not recalculated.
-                        </p>
+                            <h3 style="margin:0 0 6px 0; font-family:var(--font-display); font-size:18px;">SLA Response Windows</h3>
+                            <p style="margin:0 0 24px 0; font-size:13px; color:var(--g-text-muted);">
+                                How much time agents have to resolve a ticket before it's considered breached, by priority.
+                                Changes apply to new tickets and to the SLA warning/critical checks going forward —
+                                due dates already set on existing tickets are not recalculated.
+                            </p>
 
-                        <div id="slaConfigMsg" style="display:none; padding:12px 16px; border-radius:8px;
+                            <div id="slaConfigMsg" style="display:none; padding:12px 16px; border-radius:8px;
                                       margin-bottom:20px; font-size:13px; font-weight:500;"></div>
 
-                        <div style="display:flex; flex-direction:column; gap:18px;">
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
+                            <div style="display:flex; flex-direction:column; gap:18px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
                                         padding:14px 16px; border:1px solid var(--g-border); border-radius:10px;">
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <span style="width:10px; height:10px; border-radius:50%; background:#EA4335; display:inline-block;"></span>
-                                    <span style="font-size:14px; font-weight:500;">High priority</span>
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <span style="width:10px; height:10px; border-radius:50%; background:var(--g-red); display:inline-block;"></span>
+                                        <span style="font-size:14px; font-weight:500;">High priority</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <input type="number" id="slaHighHours" min="1" step="1"
+                                               style="width:80px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                        <span style="font-size:13px; color:var(--g-text-muted);">hours</span>
+                                    </div>
                                 </div>
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <input type="number" id="slaHighHours" min="1" step="1"
-                                           style="width:80px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
-                                    <span style="font-size:13px; color:var(--g-text-muted);">hours</span>
-                                </div>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
                                         padding:14px 16px; border:1px solid var(--g-border); border-radius:10px;">
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <span style="width:10px; height:10px; border-radius:50%; background:#F9AB00; display:inline-block;"></span>
-                                    <span style="font-size:14px; font-weight:500;">Medium priority</span>
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <span style="width:10px; height:10px; border-radius:50%; background:var(--g-yellow); display:inline-block;"></span>
+                                        <span style="font-size:14px; font-weight:500;">Medium priority</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <input type="number" id="slaMediumHours" min="1" step="1"
+                                               style="width:80px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                        <span style="font-size:13px; color:var(--g-text-muted);">hours</span>
+                                    </div>
                                 </div>
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <input type="number" id="slaMediumHours" min="1" step="1"
-                                           style="width:80px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
-                                    <span style="font-size:13px; color:var(--g-text-muted);">hours</span>
-                                </div>
-                            </div>
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
+                                <div style="display:flex; align-items:center; justify-content:space-between; gap:16px;
                                         padding:14px 16px; border:1px solid var(--g-border); border-radius:10px;">
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <span style="width:10px; height:10px; border-radius:50%; background:#34A853; display:inline-block;"></span>
-                                    <span style="font-size:14px; font-weight:500;">Low priority</span>
-                                </div>
-                                <div style="display:flex; align-items:center; gap:8px;">
-                                    <input type="number" id="slaLowHours" min="1" step="1"
-                                           style="width:80px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
-                                    <span style="font-size:13px; color:var(--g-text-muted);">hours</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--g-border);">
-                            <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; font-weight:500;">
-                                <input type="checkbox" id="slaBusinessHoursEnabled" onchange="toggleSlaBusinessHoursFields()">
-                                Only count business hours toward SLA deadlines
-                            </label>
-                            <p style="margin:4px 0 16px 26px; font-size:12px; color:var(--g-text-muted);">
-                                When on, SLA clocks pause outside the hours/days below (e.g. a Friday-evening ticket won't breach over the weekend).
-                            </p>
-
-                            <div id="slaBusinessHoursFields" style="display:none; padding-left:26px; display:flex; flex-direction:column; gap:14px;">
-                                <div style="display:flex; align-items:center; gap:12px;">
-                                    <label style="font-size:13px; width:110px;">Work hours</label>
-                                    <input type="number" id="slaWorkStartHour" min="0" max="23" step="1"
-                                           style="width:70px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
-                                    <span style="font-size:13px; color:var(--g-text-muted);">to</span>
-                                    <input type="number" id="slaWorkEndHour" min="0" max="23" step="1"
-                                           style="width:70px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
-                                    <span style="font-size:13px; color:var(--g-text-muted);">(24h, e.g. 9 to 18)</span>
-                                </div>
-                                <div style="display:flex; align-items:flex-start; gap:12px;">
-                                    <label style="font-size:13px; width:110px; padding-top:4px;">Work days</label>
-                                    <div id="slaWorkDaysGroup" style="display:flex; flex-wrap:wrap; gap:8px;">
-                                        <!-- populated by JS -->
+                                    <div style="display:flex; align-items:center; gap:10px;">
+                                        <span style="width:10px; height:10px; border-radius:50%; background:var(--g-green); display:inline-block;"></span>
+                                        <span style="font-size:14px; font-weight:500;">Low priority</span>
+                                    </div>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        <input type="number" id="slaLowHours" min="1" step="1"
+                                               style="width:80px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                        <span style="font-size:13px; color:var(--g-text-muted);">hours</span>
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <button class="g-btn g-btn-primary" onclick="saveSlaConfig()"
-                                style="margin-top:24px; padding:10px 24px; font-size:13px;">
-                            Save Changes
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Tab: Categories & Routing -->
-                <div id="settingsPanel-tabRouting" style="display:none;">
-                    <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:24px; align-items:start;">
-
-                        <!-- Categories & Sub-categories -->
-                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
-                            <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">Categories</h3>
-                            <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
-                                Categories and sub-categories used when raising a ticket.
-                            </p>
-
-                            <div id="catMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:13px; font-weight:500;"></div>
-
-                            <div style="display:flex; gap:8px; margin-bottom:18px;">
-                                <input type="text" id="newCategoryName" placeholder="New category name"
-                                       style="flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
-                                <button class="g-btn g-btn-primary" onclick="createCategory()" style="padding:8px 16px; font-size:13px;">Add</button>
-                            </div>
-
-                            <div id="categoryTreeList" style="display:flex; flex-direction:column; gap:10px;">
-                                <p style="color:var(--g-text-muted); font-size:13px;">Loading categories...</p>
-                            </div>
-                        </div>
-
-                        <!-- Routing Rules -->
-                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
-                            <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">Routing Rules</h3>
-                            <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
-                                Evaluated in order (lowest first). The first matching rule sets the target queue for a new ticket.
-                                Leave category or priority as "Any" to match everything.
-                            </p>
-
-                            <div id="routingMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:13px; font-weight:500;"></div>
-
-                            <!-- Add rule form -->
-                            <div style="display:grid; grid-template-columns: 60px 1fr 1fr 1fr auto; gap:8px; margin-bottom:10px; align-items:end;">
-                                <div>
-                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Order</label>
-                                    <input type="number" id="newRuleOrder" min="1" step="1" value="1"
-                                           style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
-                                </div>
-                                <div>
-                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Category</label>
-                                    <select id="newRuleCategory" style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
-                                        <option value="">Any</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Priority</label>
-                                    <select id="newRulePriority" style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
-                                        <option value="">Any</option>
-                                        <option value="HIGH">High</option>
-                                        <option value="MEDIUM">Medium</option>
-                                        <option value="LOW">Low</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Target Queue</label>
-                                    <input type="text" id="newRuleQueue" placeholder="e.g. Network Team"
-                                           style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
-                                </div>
-                                <button class="g-btn g-btn-primary" onclick="createRoutingRule()" style="padding:8px 16px; font-size:13px;">Add</button>
-                            </div>
-
-                            <div style="display:grid; grid-template-columns: 1fr 2fr; gap:8px; margin-bottom:18px; align-items:end;">
-                                <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; padding-bottom:8px;">
-                                    <input type="checkbox" id="newRuleAutoAssign" onchange="toggleNewRuleAgentsField()">
-                                    Auto-assign least-loaded agent
+                            <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--g-border);">
+                                <label style="display:flex; align-items:center; gap:10px; cursor:pointer; font-size:14px; font-weight:500;">
+                                    <input type="checkbox" id="slaBusinessHoursEnabled" onchange="toggleSlaBusinessHoursFields()">
+                                    Only count business hours toward SLA deadlines
                                 </label>
-                                <div id="newRuleAgentsWrapper" style="display:none;">
-                                    <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Eligible agents (comma-separated usernames)</label>
-                                    <input type="text" id="newRuleAgents" placeholder="e.g. jane, bob, amit"
-                                           style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
+                                <p style="margin:4px 0 16px 26px; font-size:12px; color:var(--g-text-muted);">
+                                    When on, SLA clocks pause outside the hours/days below (e.g. a Friday-evening ticket won't breach over the weekend).
+                                </p>
+
+                                <div id="slaBusinessHoursFields" style="display:none; padding-left:26px; display:flex; flex-direction:column; gap:14px;">
+                                    <div style="display:flex; align-items:center; gap:12px;">
+                                        <label style="font-size:13px; width:110px;">Work hours</label>
+                                        <input type="number" id="slaWorkStartHour" min="0" max="23" step="1"
+                                               style="width:70px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                        <span style="font-size:13px; color:var(--g-text-muted);">to</span>
+                                        <input type="number" id="slaWorkEndHour" min="0" max="23" step="1"
+                                               style="width:70px; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; text-align:center;">
+                                        <span style="font-size:13px; color:var(--g-text-muted);">(24h, e.g. 9 to 18)</span>
+                                    </div>
+                                    <div style="display:flex; align-items:flex-start; gap:12px;">
+                                        <label style="font-size:13px; width:110px; padding-top:4px;">Work days</label>
+                                        <div id="slaWorkDaysGroup" style="display:flex; flex-wrap:wrap; gap:8px;">
+                                            <!-- populated by JS -->
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
-                            <div style="background:var(--g-background); border:1px solid var(--g-border); border-radius:12px; overflow:hidden;">
-                                <table class="data-table">
-                                    <thead>
-                                    <tr>
-                                        <th style="width:60px;">Order</th>
-                                        <th>Category</th>
-                                        <th>Priority</th>
-                                        <th>Target Queue</th>
-                                        <th>Auto-Assign Pool</th>
-                                        <th style="width:60px;"></th>
-                                    </tr>
-                                    </thead>
-                                    <tbody id="routingRulesBody">
-                                    <tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:24px;">Loading...</td></tr>
-                                    </tbody>
-                                </table>
+                            <button class="g-btn g-btn-primary" onclick="saveSlaConfig()"
+                                    style="margin-top:24px; padding:10px 24px; font-size:13px;">
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Categories & Routing -->
+                    <div id="settingsPanel-tabRouting" style="display:none;">
+                        <div class="settings-two-col">
+
+                            <!-- Categories & Sub-categories -->
+                            <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                                <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">Categories</h3>
+                                <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
+                                    Categories and sub-categories used when raising a ticket.
+                                </p>
+
+                                <div id="catMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:13px; font-weight:500;"></div>
+
+                                <div style="display:flex; gap:8px; margin-bottom:18px;">
+                                    <input type="text" id="newCategoryName" placeholder="New category name"
+                                           style="flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
+                                    <button class="g-btn g-btn-primary" onclick="createCategory()" style="padding:8px 16px; font-size:13px;">Add</button>
+                                </div>
+
+                                <div id="categoryTreeList" style="display:flex; flex-direction:column; gap:10px;">
+                                    <p style="color:var(--g-text-muted); font-size:13px;">Loading categories...</p>
+                                </div>
+                            </div>
+
+                            <!-- Routing Rules -->
+                            <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                                <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">Routing Rules</h3>
+                                <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
+                                    Evaluated in order (lowest first). The first matching rule sets the target queue for a new ticket.
+                                    Leave category or priority as "Any" to match everything.
+                                </p>
+
+                                <div id="routingMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:13px; font-weight:500;"></div>
+
+                                <!-- Add rule form -->
+                                <div class="settings-form-row">
+                                    <div>
+                                        <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Order</label>
+                                        <input type="number" id="newRuleOrder" min="1" step="1" value="1"
+                                               style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Category</label>
+                                        <select id="newRuleCategory" style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
+                                            <option value="">Any</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Priority</label>
+                                        <select id="newRulePriority" style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
+                                            <option value="">Any</option>
+                                            <option value="HIGH">High</option>
+                                            <option value="MEDIUM">Medium</option>
+                                            <option value="LOW">Low</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Target Queue</label>
+                                        <input type="text" id="newRuleQueue" placeholder="e.g. Network Team"
+                                               style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
+                                    </div>
+                                    <button class="g-btn g-btn-primary" onclick="createRoutingRule()" style="padding:8px 16px; font-size:13px;">Add</button>
+                                </div>
+
+                                <div style="display:grid; grid-template-columns: minmax(0,1fr) minmax(0,2fr); gap:8px; margin-bottom:18px; align-items:end;">
+                                    <label style="display:flex; align-items:center; gap:8px; font-size:12px; cursor:pointer; padding-bottom:8px;">
+                                        <input type="checkbox" id="newRuleAutoAssign" onchange="toggleNewRuleAgentsField()">
+                                        Auto-assign least-loaded agent
+                                    </label>
+                                    <div id="newRuleAgentsWrapper" style="display:none;">
+                                        <label style="display:block; font-size:11px; color:var(--g-text-muted); margin-bottom:4px;">Eligible agents (comma-separated usernames)</label>
+                                        <input type="text" id="newRuleAgents" placeholder="e.g. jane, bob, amit"
+                                               style="width:100%; padding:8px 8px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box;">
+                                    </div>
+                                </div>
+
+                                <div style="background:var(--g-background); border:1px solid var(--g-border); border-radius:12px; overflow-x:auto;">
+                                    <table class="data-table">
+                                        <thead>
+                                        <tr>
+                                            <th style="width:60px;">Order</th>
+                                            <th>Category</th>
+                                            <th>Priority</th>
+                                            <th>Target Queue</th>
+                                            <th>Auto-Assign Pool</th>
+                                            <th style="width:60px;"></th>
+                                        </tr>
+                                        </thead>
+                                        <tbody id="routingRulesBody">
+                                        <tr><td colspan="5" style="text-align:center; color:var(--g-text-muted); padding:24px;">Loading...</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                <!-- Tab: Canned Responses -->
-                <div id="settingsPanel-tabCanned" style="display:none;">
-                    <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:24px; align-items:start;">
-                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
-                            <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">New Canned Response</h3>
-                            <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
-                                Reusable reply templates agents can insert into any comment box.
-                            </p>
-                            <div id="cannedMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px; font-weight:500;"></div>
-                            <input type="text" id="newCannedTitle" placeholder="Title (e.g. 'Password reset steps')"
-                                   style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; margin-bottom:10px; font-family:var(--font-ui);">
-                            <textarea id="newCannedBody" placeholder="Response body..." rows="6"
-                                      style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; resize:vertical; font-family:var(--font-ui);"></textarea>
-                            <button class="g-btn g-btn-primary" onclick="createCannedResponse()" style="margin-top:10px; padding:8px 16px; font-size:13px;">Create</button>
-                        </div>
+                    <!-- Tab: Canned Responses -->
+                    <div id="settingsPanel-tabCanned" style="display:none;">
+                        <div class="settings-two-col">
+                            <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                                <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">New Canned Response</h3>
+                                <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
+                                    Reusable reply templates agents can insert into any comment box.
+                                </p>
+                                <div id="cannedMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px; font-weight:500;"></div>
+                                <input type="text" id="newCannedTitle" placeholder="Title (e.g. 'Password reset steps')"
+                                       style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; margin-bottom:10px; font-family:var(--font-ui);">
+                                <textarea id="newCannedBody" placeholder="Response body..." rows="6"
+                                          style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; resize:vertical; font-family:var(--font-ui);"></textarea>
+                                <button class="g-btn g-btn-primary" onclick="createCannedResponse()" style="margin-top:10px; padding:8px 16px; font-size:13px;">Create</button>
+                            </div>
 
-                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
-                            <h3 style="margin:0 0 16px 0; font-family:var(--font-display); font-size:16px;">Library</h3>
-                            <div id="cannedResponseList" style="display:flex; flex-direction:column; gap:10px;">
-                                <p style="color:var(--g-text-muted); font-size:13px;">Loading canned responses...</p>
+                            <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                                <h3 style="margin:0 0 16px 0; font-family:var(--font-display); font-size:16px;">Library</h3>
+                                <div id="cannedResponseList" style="display:flex; flex-direction:column; gap:10px;">
+                                    <p style="color:var(--g-text-muted); font-size:13px;">Loading canned responses...</p>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Tab: Knowledge Base -->
-                <div id="settingsPanel-tabKb" style="display:none;">
-                    <div style="display:grid; grid-template-columns: 1fr 1.3fr; gap:24px; align-items:start;">
-                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
-                            <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">New Article</h3>
-                            <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
-                                Shown to requesters at ticket-creation time when relevant, deflecting tickets before they're filed.
-                            </p>
-                            <div id="kbMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px; font-weight:500;"></div>
-                            <input type="text" id="newKbTitle" placeholder="Title (e.g. 'How to reset your VPN password')"
-                                   style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; margin-bottom:10px; font-family:var(--font-ui);">
-                            <select id="newKbCategory" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; margin-bottom:10px;">
-                                <option value="">No category</option>
-                            </select>
-                            <textarea id="newKbBody" placeholder="Article body (markdown-ish plain text is fine)..." rows="8"
-                                      style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; resize:vertical; font-family:var(--font-ui);"></textarea>
-                            <button class="g-btn g-btn-primary" onclick="createKbArticle()" style="margin-top:10px; padding:8px 16px; font-size:13px;">Publish</button>
-                        </div>
+                    <!-- Tab: Knowledge Base -->
+                    <div id="settingsPanel-tabKb" style="display:none;">
+                        <div class="settings-two-col">
+                            <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                                <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">New Article</h3>
+                                <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">
+                                    Shown to requesters at ticket-creation time when relevant, deflecting tickets before they're filed.
+                                </p>
+                                <div id="kbMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px; font-weight:500;"></div>
+                                <input type="text" id="newKbTitle" placeholder="Title (e.g. 'How to reset your VPN password')"
+                                       style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; margin-bottom:10px; font-family:var(--font-ui);">
+                                <select id="newKbCategory" style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; margin-bottom:10px;">
+                                    <option value="">No category</option>
+                                </select>
+                                <textarea id="newKbBody" placeholder="Article body (markdown-ish plain text is fine)..." rows="8"
+                                          style="width:100%; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; box-sizing:border-box; resize:vertical; font-family:var(--font-ui);"></textarea>
+                                <button class="g-btn g-btn-primary" onclick="createKbArticle()" style="margin-top:10px; padding:8px 16px; font-size:13px;">Publish</button>
+                            </div>
 
-                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
-                            <h3 style="margin:0 0 16px 0; font-family:var(--font-display); font-size:16px;">All Articles</h3>
-                            <div id="kbArticleList" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;">
-                                <p style="color:var(--g-text-muted); font-size:13px;">Loading articles...</p>
+                            <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px;">
+                                <h3 style="margin:0 0 16px 0; font-family:var(--font-display); font-size:16px;">All Articles</h3>
+                                <div id="kbArticleList" style="display:flex; flex-direction:column; gap:10px; max-height:520px; overflow-y:auto;">
+                                    <p style="color:var(--g-text-muted); font-size:13px;">Loading articles...</p>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-                <!-- Tab: Webhooks -->
-                <div id="settingsPanel-tabWebhooks" style="display:none;">
-                    <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px; margin-bottom:20px;">
-                        <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">Add Webhook</h3>
-                        <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">Fires on SLA breach. Paste a Slack or Discord incoming-webhook URL.</p>
-                        <div id="webhookMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px; font-weight:500;"></div>
-                        <div style="display:flex; gap:8px;">
-                            <select id="newWebhookPlatform" style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
-                                <option value="SLACK">Slack</option>
-                                <option value="DISCORD">Discord</option>
-                                <option value="GENERIC">Generic (JSON)</option>
-                            </select>
-                            <input type="text" id="newWebhookUrl" placeholder="https://hooks.slack.com/services/..."
-                                   style="flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
-                            <button class="g-btn g-btn-primary" onclick="createWebhook()" style="padding:8px 16px; font-size:13px;">Add</button>
+                    <!-- Tab: Webhooks -->
+                    <div id="settingsPanel-tabWebhooks" style="display:none;">
+                        <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px; padding:24px; margin-bottom:20px;">
+                            <h3 style="margin:0 0 4px 0; font-family:var(--font-display); font-size:16px;">Add Webhook</h3>
+                            <p style="margin:0 0 16px 0; font-size:12px; color:var(--g-text-muted);">Fires on SLA breach. Paste a Slack or Discord incoming-webhook URL.</p>
+                            <div id="webhookMgmtMsg" style="display:none; padding:10px 14px; border-radius:8px; margin-bottom:14px; font-size:12px; font-weight:500;"></div>
+                            <div style="display:flex; gap:8px;">
+                                <select id="newWebhookPlatform" style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
+                                    <option value="SLACK">Slack</option>
+                                    <option value="DISCORD">Discord</option>
+                                    <option value="GENERIC">Generic (JSON)</option>
+                                </select>
+                                <input type="text" id="newWebhookUrl" placeholder="https://hooks.slack.com/services/..."
+                                       style="flex:1; padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px;">
+                                <button class="g-btn g-btn-primary" onclick="createWebhook()" style="padding:8px 16px; font-size:13px;">Add</button>
+                            </div>
                         </div>
-                    </div>
-                    <div id="webhookList" style="display:flex; flex-direction:column; gap:10px;">
-                        <p style="color:var(--g-text-muted); font-size:13px;">Loading webhooks...</p>
+                        <div id="webhookList" style="display:flex; flex-direction:column; gap:10px;">
+                            <p style="color:var(--g-text-muted); font-size:13px;">Loading webhooks...</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1246,22 +1307,24 @@
                 <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; margin-bottom:16px;">
                     <div>
                         <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">From</label>
-                        <input type="date" id="reportFrom" onchange="activeRangePreset = null; loadAgentPerformance()"
+                        <input type="date" id="reportFrom" onchange="activeRangePreset = null; updateReportPresetButtons(); loadAgentPerformance()"
                                style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
                     </div>
                     <div>
                         <label style="display:block; font-size:12px; color:var(--g-text-muted); margin-bottom:4px;">To</label>
-                        <input type="date" id="reportTo" onchange="activeRangePreset = null; loadAgentPerformance()"
+                        <input type="date" id="reportTo" onchange="activeRangePreset = null; updateReportPresetButtons(); loadAgentPerformance()"
                                style="padding:8px 10px; border-radius:8px; border:1px solid var(--g-border); font-size:13px; font-family:var(--font-ui);">
                     </div>
-                    <button class="g-btn" id="presetBtn7" onclick="setReportRangePreset(7)" style="padding:8px 14px; font-size:13px;">Last 7 days</button>
-                    <button class="g-btn" id="presetBtn30" onclick="setReportRangePreset(30)" style="padding:8px 14px; font-size:13px;">Last 30 days</button>
-                    <button class="g-btn" id="presetBtnAll" onclick="clearReportRange()" style="padding:8px 14px; font-size:13px;">All time</button>
+                    <div class="segmented-control">
+                        <button class="segmented-option" id="presetBtn7" onclick="setReportRangePreset(7)">Last 7 days</button>
+                        <button class="segmented-option" id="presetBtn30" onclick="setReportRangePreset(30)">Last 30 days</button>
+                        <button class="segmented-option active" id="presetBtnAll" onclick="clearReportRange()">All time</button>
+                    </div>
                     <span id="reportRangeLabel" style="font-size:12px; color:var(--g-text-muted); margin-left:4px;"></span>
                 </div>
 
                 <div style="background:var(--g-surface); border:1px solid var(--g-border); border-radius:16px;
-                overflow:hidden; box-shadow:0 1px 2px rgba(60,64,67,0.1);">
+                overflow:hidden; box-shadow:0 1px 2px rgba(3, 4, 94,0.1);">
                     <table class="data-table" id="agentPerfTable">
                         <thead>
                         <tr>
@@ -1287,13 +1350,10 @@
                         <span style="font-weight:600; font-size:15px; font-family:var(--font-display);">
                             Ticket Volume Trend
                         </span>
-                        <div style="display:flex; gap:8px;">
-                            <button class="g-btn g-btn-text" onclick="loadVolumeTrend(7)"
-                                    style="padding:0 12px; height:28px; font-size:12px;" id="vol7">7d</button>
-                            <button class="g-btn g-btn-text" onclick="loadVolumeTrend(30)"
-                                    style="padding:0 12px; height:28px; font-size:12px;" id="vol30">30d</button>
-                            <button class="g-btn g-btn-text" onclick="loadVolumeTrend(90)"
-                                    style="padding:0 12px; height:28px; font-size:12px;" id="vol90">90d</button>
+                        <div class="segmented-control">
+                            <button class="segmented-option" onclick="loadVolumeTrend(7)" id="vol7">7d</button>
+                            <button class="segmented-option active" onclick="loadVolumeTrend(30)" id="vol30">30d</button>
+                            <button class="segmented-option" onclick="loadVolumeTrend(90)" id="vol90">90d</button>
                         </div>
                     </div>
                     <div class="chart-body">
@@ -1305,82 +1365,122 @@
     </main>
 </div>
 
-<dialog id="createModal" class="md-dialog">
-    <div style="margin-bottom: 24px;">
-        <h3 style="margin: 0; font-family: var(--font-display); font-size: 24px;">Raise Incident</h3>
-        <p style="margin: 6px 0 0 0; font-size: 14px; color: var(--g-text-muted);">Fill in the details below to log a new incident.</p>
+<dialog id="createModal" class="md-dialog" aria-labelledby="createModalTitle">
+    <div style="margin-bottom: 20px;">
+        <h3 id="createModalTitle" style="margin: 0; font-family: var(--font-display); font-size: 24px;">Raise Incident</h3>
+        <p style="margin: 6px 0 0 0; font-size: 14px; color: var(--g-text-muted);">Tell us what's wrong — we'll fill in what we can.</p>
     </div>
 
-    <form id="ticketForm">
-        <div class="g-input-group">
-            <input type="text" id="title" placeholder=" " required autocomplete="off">
-            <label for="title">Incident Title <span style="color: var(--g-red);">*</span></label>
+    <!-- Goal-gradient stepper: starts with a head start rather than 0%, since -->
+    <!-- picking smart defaults already did part of the work for the user. -->
+    <div class="tm-wizard-stepper" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="15" id="wizardProgressbar">
+        <div class="tm-wizard-track"><div class="tm-wizard-fill" id="wizardProgressFill"></div></div>
+        <div class="tm-wizard-labels">
+            <span id="wizardStepLabel1" class="tm-wizard-step-label active">1. What's happening</span>
+            <span id="wizardStepLabel2" class="tm-wizard-step-label">2. Confirm &amp; submit</span>
+        </div>
+    </div>
+
+    <form id="ticketForm" novalidate>
+
+        <!-- ======= STEP 1 — just the two things only the reporter can know ======= -->
+        <div id="wizardStep1" class="tm-wizard-step">
+            <div class="g-input-group">
+                <input type="text" id="title" placeholder=" " required autocomplete="off"
+                       aria-describedby="titleError" oninput="clearFieldError('title')">
+                <label for="title">Incident Title <span style="color: var(--g-red);">*</span></label>
+            </div>
+            <div class="tm-field-error" id="titleError" role="alert"></div>
+
+            <div id="relatedArticlesPanel" style="display:none; margin:4px 0 16px; padding:12px; background:var(--g-background); border-radius:10px;"></div>
+
+            <div class="g-input-group">
+                <textarea id="description" placeholder=" " rows="4" required
+                          maxlength="1000" oninput="updateCharCounter(); clearFieldError('description')"
+                          aria-describedby="descriptionError"></textarea>
+                <label for="description">Detailed Description <span style="color: var(--g-red);">*</span></label>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="tm-field-error" id="descriptionError" role="alert"></div>
+                <div class="char-counter" id="descCharCounter">0 / 1000</div>
+            </div>
+
+            <div style="text-align: right; margin-top: 6px;">
+                <button type="button" class="g-btn g-btn-text" onclick="suggestClassification()" id="suggestBtn"
+                        style="font-size: 13px; color: var(--g-blue);">
+                    ✨ Suggest Category &amp; Priority
+                </button>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+                <button type="button" class="g-btn g-btn-text" onclick="document.getElementById('createModal').close()">Cancel</button>
+                <button type="button" class="g-btn g-btn-primary" onclick="goToWizardStep(2)">Continue</button>
+            </div>
         </div>
 
-        <div id="relatedArticlesPanel" style="display:none; margin-bottom:16px; padding:12px; background:var(--g-background); border-radius:10px;"></div>
+        <!-- ======= STEP 2 — smart defaults already chosen; user scans & adjusts ======= -->
+        <div id="wizardStep2" class="tm-wizard-step" style="display:none;">
 
-        <!-- Priority + Category row — each select has its own AI chip below it -->
-        <div style="display: flex; gap: 16px; margin-bottom: 32px;">
-
-            <div style="flex: 1;">
-                <div class="g-input-group" style="margin-bottom: 4px;">
-                    <select id="priority" required
-                            onchange="document.getElementById('priorityAiChip').style.display='none'">
-                        <option value="" disabled selected hidden></option>
-                        <option value="LOW">Low (P4)</option>
-                        <option value="MEDIUM">Medium (P3)</option>
-                        <option value="HIGH">High (P1-P2)</option>
-                    </select>
-                    <label>Priority Level <span style="color: var(--g-red);">*</span></label>
+            <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+                <div style="flex: 1;">
+                    <div class="g-input-group" style="margin-bottom: 4px;">
+                        <select id="priority" required
+                                onchange="document.getElementById('priorityAiChip').style.display='none'">
+                            <option value="LOW">Low (P4)</option>
+                            <option value="MEDIUM" selected>Medium (P3)</option>
+                            <option value="HIGH">High (P1-P2)</option>
+                        </select>
+                        <label>Priority Level <span style="color: var(--g-red);">*</span></label>
+                    </div>
+                    <span id="priorityAiChip" class="ai-chip" style="display:none;">✨ AI suggested</span>
+                    <span class="tm-default-chip" id="priorityDefaultChip">Defaulted to Medium — adjust if needed</span>
                 </div>
-                <span id="priorityAiChip" class="ai-chip">✨ AI suggested</span>
-            </div>
 
-            <div style="flex: 1;">
-                <div class="g-input-group" style="margin-bottom: 4px;">
-                    <select id="category" required
-                            onchange="document.getElementById('categoryAiChip').style.display='none'">
-                        <option value="" disabled selected hidden></option>
-                    </select>
-                    <label>Category <span style="color: var(--g-red);">*</span></label>
+                <div style="flex: 1;">
+                    <div class="g-input-group" style="margin-bottom: 4px;">
+                        <select id="category" required onchange="onCategoryChanged()">
+                            <option value="" disabled selected hidden></option>
+                        </select>
+                        <label>Category <span style="color: var(--g-red);">*</span></label>
+                    </div>
+                    <span id="categoryAiChip" class="ai-chip" style="display:none;">✨ AI suggested</span>
+                    <span class="tm-default-chip" id="categoryDefaultChip" style="display:none;">Defaulted — adjust if needed</span>
                 </div>
-                <span id="categoryAiChip" class="ai-chip">✨ AI suggested</span>
             </div>
+            <div class="tm-field-error" id="categoryError" role="alert" style="margin-bottom:20px;"></div>
 
-        </div>
+            <!-- Progressive disclosure: category-specific fields and attachments are -->
+            <!-- secondary detail, so they stay collapsed until the reporter asks for them. -->
+            <details class="tm-disclosure" id="advancedDetailsPanel">
+                <summary>Add more detail <span class="tm-disclosure-hint">(custom fields, attachments — optional)</span></summary>
+                <div class="tm-disclosure-body">
+                    <div id="dynamicCustomFieldsContainer" class="tm-custom-fields-grid"></div>
 
-        <div class="g-input-group">
-            <textarea id="description" placeholder=" " rows="4" required
-                      maxlength="1000" oninput="updateCharCounter()"></textarea>
-            <label for="description">Detailed Description <span style="color: var(--g-red);">*</span></label>
-        </div>
-        <div class="char-counter" id="descCharCounter">0 / 1000</div>
+                    <div style="margin-top:12px; border:1px dashed var(--g-border); border-radius:8px; padding:12px 16px;
+                        display:flex; align-items:center; justify-content:space-between; background:var(--g-background);">
+                        <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--g-text-muted);">
+                            <span class="material-symbols-rounded" style="font-size:18px;" aria-hidden="true">attach_file</span>
+                            <span id="createAttachLabel">Attach files (optional, max 10 MB each)</span>
+                        </div>
+                        <label style="cursor:pointer; font-size:13px; color:var(--g-blue); font-weight:500;">
+                            Browse
+                            <input type="file" id="createAttachInput" multiple style="display:none;"
+                                   onchange="updateCreateAttachLabel(this)" aria-label="Attach files to this ticket">
+                        </label>
+                    </div>
+                </div>
+            </details>
 
-        <!-- D2: Suggest button sits right below the description textarea -->
-        <div style="text-align: right; margin-top: 6px;">
-            <button type="button" class="g-btn g-btn-text" onclick="suggestClassification()" id="suggestBtn"
-                    style="font-size: 13px; color: var(--g-blue);">
-                ✨ Suggest Category &amp; Priority
-            </button>
-        </div>
-
-        <!-- Attach files at creation time -->
-        <div style="margin-top:12px; border:1px dashed var(--g-border); border-radius:8px; padding:12px 16px;
-            display:flex; align-items:center; justify-content:space-between; background:var(--g-background);">
-            <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--g-text-muted);">
-                <span class="material-symbols-rounded" style="font-size:18px;">attach_file</span>
-                <span id="createAttachLabel">Attach files (optional, max 10 MB each)</span>
+            <div style="display: flex; justify-content: space-between; gap: 8px; margin-top: 24px;">
+                <button type="button" class="g-btn g-btn-text" onclick="goToWizardStep(1)">
+                    <span class="material-symbols-rounded" style="font-size:16px; vertical-align:middle;" aria-hidden="true">arrow_back</span>
+                    Back
+                </button>
+                <div style="display:flex; gap:8px;">
+                    <button type="button" class="g-btn g-btn-text" onclick="document.getElementById('createModal').close()">Cancel</button>
+                    <button type="submit" class="g-btn g-btn-primary" id="submitTicketBtn">Submit Ticket</button>
+                </div>
             </div>
-            <label style="cursor:pointer; font-size:13px; color:var(--g-blue); font-weight:500;">
-                Browse
-                <input type="file" id="createAttachInput" multiple style="display:none;"
-                       onchange="updateCreateAttachLabel(this)">
-            </label>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px;">
-            <button type="button" class="g-btn g-btn-text" onclick="document.getElementById('createModal').close()">Cancel</button>
-            <button type="submit" class="g-btn g-btn-primary">Submit Ticket</button>
         </div>
     </form>
 </dialog>
@@ -1443,22 +1543,19 @@
         <span style="color: var(--g-text-muted); font-size: 13px;" id="detailSubId"></span>
     </div>
 
+    <!-- Live collision detection — always visible near the top regardless of -->
+    <!-- which tab (Comments/History) is active, since "someone else is here -->
+    <!-- right now" matters before you start typing, not just inside one tab. -->
+    <div id="collisionBanner" class="collision-banner" style="display:none;"></div>
+
     <!-- Status progress stepper -->
     <div id="statusStepper" class="status-stepper"></div>
+    <div id="detailSlaLine" style="margin: 10px 0 2px;"></div>
+
     <div style="display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; align-items: center;">
         <span class="ticket-chip" id="detailStatusChip"></span>
-        <span class="ticket-chip" id="detailPriorityChip"></span>
+        <span class="priority-chip" id="detailPriorityChip"></span>
         <span style="font-size: 12px; border: 1px solid var(--g-border); padding: 4px 10px; border-radius: 100px; color: var(--g-text-muted);" id="detailCategoryChip"></span>
-
-        <!-- SLA Pause/Resume button — ADMIN only, shown/hidden by JS -->
-        <button id="slaPauseBtn" onclick="toggleSlaPause()"
-                style="display:none; font-size:12px; font-weight:500; border:1px solid var(--g-border);
-               border-radius:100px; padding:4px 12px; background:var(--g-surface);
-               cursor:pointer; font-family:var(--font-ui); color:var(--g-text-muted);
-               display:none; align-items:center; gap:4px;">
-            <span class="material-symbols-rounded" style="font-size:14px;" id="slaPauseIcon">pause</span>
-            <span id="slaPauseLabel">Pause SLA</span>
-        </button>
 
         <!-- Assigned agent pill + reassign dropdown -->
         <div style="display:flex; align-items:center; gap:6px; margin-left: auto;">
@@ -1481,6 +1578,10 @@
             </span>
         </div>
     </div>
+
+    <!-- Grouped primary actions — everything that moves the ticket forward lives -->
+    <!-- in one place, separate from secondary/reference actions further down. -->
+    <div class="detail-action-bar" id="detailActionBar"></div>
 
     <div style="background-color: var(--g-background); padding: 16px; border-radius: 8px; border: 1px solid var(--g-border); margin-bottom: 24px;">
         <div style="font-size: 12px; font-weight: 600; color: var(--g-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Description</div>
@@ -1571,13 +1672,11 @@
 
     <!-- Comments panel (default visible) -->
     <div id="detailPanelComments">
-        <div id="collisionBanner" style="display:none; background:#FEF7E0; border:1px solid #F9AB00; color:#B06000;
-            border-radius:8px; padding:8px 12px; font-size:12px; margin-bottom:12px;"></div>
         <div id="detailCommentsList" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;"></div>
 
         <div class="g-input-group" style="margin-bottom: 12px;">
         <textarea id="newCommentContent" placeholder=" " rows="3"
-              style="width: 100%; padding: 16px 14px; border: 1px solid var(--g-border); border-radius: 4px;
+                  style="width: 100%; padding: 16px 14px; border: 1px solid var(--g-border); border-radius: 4px;
                font-family: var(--font-ui); font-size: 14px; background: transparent;
                outline: none; resize: vertical; box-sizing: border-box; color: var(--g-text-main);"></textarea>
             <label for="newCommentContent">Add a comment</label>

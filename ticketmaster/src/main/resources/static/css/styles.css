@@ -1,223 +1,429 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@300;400;500;600&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0');
+/* =========================================================================
+   TRACKTICKET APPLICATION STYLESHEET
+   =========================================================================
+   This is the single stylesheet for the product itself (dashboard, console,
+   ticket detail, settings) — as opposed to brand.css, which is scoped to the
+   public marketing site (landing.html, login.html).
+
+   It imports brand.css and re-exposes the same palette/type/radius/shadow
+   tokens under the --g-* / --font-* names the app's markup already uses, so
+   the whole product (marketing site + login + workspace) is visually one
+   thing instead of two different design languages that happen to share a
+   logo. Nothing here should introduce a second color story — if a new
+   component needs a color, it should reach for one of these tokens.
+   ========================================================================= */
+
+@import url('/css/brand.css');
 
 :root {
-    /* Authentic Google Brand Colors */
-    --g-blue: #1A73E8;
-    --g-blue-dark: #1557B0;
-    --g-blue-light: #E8F0FE;
-    --g-red: #D93025;
-    --g-green: #1E8E3E;
-    --g-yellow: #F9AB00;
+    /* --- Surface & text: aliased straight onto the brand tokens --- */
+    --g-background:  var(--tm-bg-alt);
+    --g-surface:      var(--tm-surface);
+    --g-border:       var(--tm-border);
+    --g-text-main:    var(--tm-text-main);
+    --g-text-muted:   var(--tm-text-muted);
+    --g-text-faint:   var(--tm-text-faint);
 
-    /* M3 Surface & Line Colors */
-    --g-surface: #FFFFFF;
-    --g-background: #F8F9FA;
-    --g-border: #DADCE0;
-    --g-text-main: #202124;
-    --g-text-muted: #5F6368;
+    /* --- Primary / accent: brand navy + cyan, same as the marketing site --- */
+    --g-blue:        var(--tm-signal-deep);  /* #0077b6 — interactive accent, links, focus */
+    --g-blue-dark:   var(--tm-primary);      /* #023e8a — primary button fill */
+    --g-blue-light:  var(--tm-primary-tint); /* pale wash for chips/backgrounds */
 
-    /* Typography Stack */
-    --font-display: 'Outfit', sans-serif;
-    --font-ui: 'Inter', sans-serif;
+    /* --- Status colors: kept semantically named so status logic in JS
+       (ticket priority, SLA state, toasts) doesn't need to change --- */
+    --g-red:      #C0392B;
+    --g-red-bg:   #FDECEA;
+    --g-green:    var(--tm-success);
+    --g-green-bg: var(--tm-success-bg);
+    --g-yellow:      #9A5B00;
+    --g-yellow-bg:   #FFF3E0;
+    /* A distinct middle tier between "warning" (yellow) and "breached" (red) —
+       used for SLA_CRITICAL notifications so the two don't look identical. */
+    --g-orange:      #C2410C;
+    --g-orange-bg:   #FDECDC;
+
+    /* --- Vivid data-viz palette ---
+       Badge/text colors above are deliberately muted so small text stays
+       readable on a tinted background. Big bold KPI numbers and chart fills
+       don't have that constraint and read as flat/dull at that size with the
+       same muted tones — these are saturated on purpose, for numbers and
+       chart segments only, never for body text. */
+    --viz-blue:   #2563EB;
+    --viz-red:    #E11D48;
+    --viz-orange: #F59E0B;
+    --viz-green:  #16A34A;
+    --viz-purple: #7C3AED;
+    --viz-slate:  #64748B;
+
+    /* --- Type & shape: reuse brand tokens directly --- */
+    --font-display: var(--tm-font-display);
+    --font-ui:      var(--tm-font-body);
+    --radius-sm: var(--tm-radius-sm);
+    --radius-md: var(--tm-radius-md);
+    --radius-lg: var(--tm-radius-lg);
+    --shadow-sm: var(--tm-shadow-sm);
+    --shadow-md: var(--tm-shadow-md);
+    --shadow-lg: var(--tm-shadow-lg);
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; }
 
 body {
     font-family: var(--font-ui);
     color: var(--g-text-main);
-    background-color: var(--g-background);
-    -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 {
+    font-family: var(--font-display);
 }
 
-h1, h2, h3, h4, h5 { font-family: var(--font-display); font-weight: 500; }
-
-/* =========================================
-   ANIMATED GEMINI/NOTEBOOKLM BACKGROUND
-   ========================================= */
-.ethereal-bg {
-    position: fixed;
-    top: 0; left: 0; width: 100vw; height: 100vh;
-    z-index: -1;
-    background-color: var(--g-background);
-    overflow: hidden;
+/* =========================================================================
+   ICONS
+   ========================================================================= */
+.material-symbols-rounded {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    vertical-align: middle;
 }
 
-.ethereal-bg::before, .ethereal-bg::after {
-    content: '';
-    position: absolute;
-    width: 60vw; height: 60vw;
-    border-radius: 50%;
-    filter: blur(120px);
-    opacity: 0.4;
-    animation: drift 20s infinite alternate ease-in-out;
+/* =========================================================================
+   BUTTONS
+   =========================================================================
+   One button system for the whole product — dashboard, console, dialogs,
+   settings. Pill-shaped to match the brand site's button language, just
+   slightly more compact for in-app density. */
+.g-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 40px; padding: 0 20px;
+    font-family: var(--font-ui); font-size: 14px; font-weight: 500;
+    border-radius: 100px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--g-text-main);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
 }
+.g-btn:hover { background-color: var(--g-background); }
+.g-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.g-btn:focus-visible { outline: 2px solid var(--g-blue); outline-offset: 2px; }
 
-.ethereal-bg::before {
-    background: rgba(26, 115, 232, 0.15); /* Soft Google Blue */
-    top: -10vw; left: -10vw;
+.g-btn-text {
+    color: var(--g-blue-dark);
 }
+.g-btn-text:hover { background-color: var(--g-blue-light); }
 
-.ethereal-bg::after {
-    background: rgba(161, 66, 244, 0.12); /* Soft Purple */
-    bottom: -10vw; right: -10vw;
-    animation-delay: -10s;
+.g-btn-primary {
+    background: var(--g-blue-dark);
+    color: #FFFFFF;
+    border-color: var(--g-blue-dark);
+    box-shadow: 0 1px 2px rgba(2, 62, 138, 0.25);
 }
+.g-btn-primary:hover { background: var(--tm-primary-dark, #03045e); border-color: var(--tm-primary-dark, #03045e); }
 
-@keyframes drift {
-    0% { transform: translate(0, 0) scale(1); }
-    100% { transform: translate(5vw, 5vh) scale(1.1); }
+.g-btn-danger {
+    background: var(--g-red);
+    color: #FFFFFF;
+    border-color: var(--g-red);
 }
+.g-btn-danger:hover { background: #A5301F; border-color: #A5301F; }
 
-/* =========================================
-   GOOGLE IDENTITY INPUTS (FLOATING LABELS)
-   ========================================= */
-.g-input-group {
-    position: relative;
-    margin-bottom: 24px;
-    width: 100%;
+.g-btn-outline {
+    background: transparent;
+    color: var(--g-text-main);
+    border-color: var(--g-border);
 }
+.g-btn-outline:hover { border-color: var(--g-blue); background: var(--g-background); }
+
+/* =========================================================================
+   INPUTS — Material-style "outlined" floating label
+   =========================================================================
+   The select/textarea variants of .g-input-group already live inline in
+   index.html; this fills in the base <input> case (previously undefined,
+   which is why plain text fields rendered with no border and a label
+   sitting on top of the typed value). */
+.g-input-group { position: relative; margin-bottom: 20px; }
 
 .g-input-group input {
     width: 100%;
     padding: 16px 14px;
     border: 1px solid var(--g-border);
-    border-radius: 4px; /* Google uses 4px for auth inputs */
-    font-size: 16px;
+    border-radius: 4px;
+    font-size: 15px;
     font-family: var(--font-ui);
     color: var(--g-text-main);
     background-color: transparent;
     outline: none;
     transition: border-color 0.2s ease, padding 0.2s ease;
 }
-
 .g-input-group input:focus {
     border: 2px solid var(--g-blue);
-    padding: 15px 13px; /* Prevent layout shift from 2px border */
+    padding: 15px 13px;
+}
+.g-input-group input[aria-invalid="true"] {
+    border-color: var(--g-red);
 }
 
-/* The Floating Label */
 .g-input-group label {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    background-color: var(--g-surface);
-    padding: 0 4px;
-    color: var(--g-text-muted);
-    font-size: 16px;
+    position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+    font-size: 15px; color: var(--g-text-muted);
     pointer-events: none;
-    transition: 0.15s ease-out all;
+    background-color: transparent;
+    padding: 0;
+    transition: all 0.2s ease;
 }
-
-/* Slide up on Focus OR when text is entered */
 .g-input-group input:focus ~ label,
 .g-input-group input:not(:placeholder-shown) ~ label {
-    top: 0;
-    font-size: 12px;
-    font-weight: 500;
-}
-
-/* Color it blue ONLY on focus */
-.g-input-group input:focus ~ label {
+    top: 0; transform: translateY(-50%);
+    font-size: 12px; font-weight: 500;
+    background-color: var(--g-surface);
+    padding: 0 4px;
     color: var(--g-blue);
 }
 
-/* =========================================
-   BUTTONS & CARDS
-   ========================================= */
-.g-btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    height: 40px; padding: 0 24px; border-radius: 100px;
-    font-family: var(--font-ui); font-size: 14px; font-weight: 500;
-    border: none; cursor: pointer; transition: background 0.2s, box-shadow 0.2s;
-}
-
-.g-btn-primary {
-    background-color: var(--g-blue);
-    color: #fff;
-}
-
-.g-btn-primary:hover {
-    background-color: var(--g-blue-dark);
-    box-shadow: 0 1px 3px rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
-}
-
-.g-btn-text {
-    background-color: transparent;
-    color: var(--g-blue);
-}
-
-.g-btn-text:hover {
-    background-color: var(--g-blue-light);
-}
-
-/* Auth Card */
+/* Generic card, for any surface that wants the brand's elevated-panel look
+   without living inside the app shell (e.g. auth screens, empty states). */
 .g-card {
     background: var(--g-surface);
     border: 1px solid var(--g-border);
-    border-radius: 8px; /* Classic Google Auth Corner */
-    padding: 40px;
-    width: 100%;
-    max-width: 448px;
-    box-shadow: 0 1px 2px 0 rgba(60,64,67,0.1), 0 2px 6px 2px rgba(60,64,67,0.05);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 32px;
 }
 
-/* Notification panel row */
-.notif-row {
-    display: flex;
-    gap: 12px;
-    padding: 12px 20px;
-    border-bottom: 1px solid var(--g-border);
-    cursor: default;
-    transition: background 0.1s;
-}
-.notif-row.unread { background: #EEF3FD; }
-.notif-row:hover { background: var(--g-background); }
-.notif-row:last-child { border-bottom: none; }
-
-/* ===== DARK MODE ===== */
-body[data-theme="dark"] {
-    --g-background: #1C1C1E;
-    --g-surface:    #2C2C2E;
-    --g-border:     #3A3A3C;
-    --g-text-main:  #F2F2F7;
-    --g-text-muted: #8E8E93;
-    --g-blue-light: #1C3A5E;
-    --g-blue-dark:  #64B5F6;
-}
-
-body[data-theme="dark"] .nav-item:hover { background-color: #3A3A3C; }
-body[data-theme="dark"] .data-table th  { background: #2C2C2E; }
-body[data-theme="dark"] .data-table tbody tr:hover { background-color: #3A3A3C; }
-body[data-theme="dark"] .g-input-group select ~ label,
-body[data-theme="dark"] .g-input-group textarea:focus ~ label,
-body[data-theme="dark"] .g-input-group textarea:not(:placeholder-shown) ~ label { background-color: #2C2C2E; }
-body[data-theme="dark"] .chart-tab:hover:not(.active) { background: #3A3A3C; }
-body[data-theme="dark"] #F8F9FA,
-body[data-theme="dark"] .data-table th { background-color: #2C2C2E; }
-/* ===== LOADING SKELETONS ===== */
-@keyframes skeleton-shimmer {
-    0%   { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-}
-
+/* =========================================================================
+   LOADING SKELETONS
+   ========================================================================= */
 .skel {
     display: inline-block;
-    height: 12px;
+    background: linear-gradient(90deg, var(--g-border) 25%, var(--tm-cyan-100, #eef7fa) 37%, var(--g-border) 63%);
+    background-size: 400% 100%;
     border-radius: 6px;
-    background: linear-gradient(90deg, var(--g-border) 25%, var(--g-background) 50%, var(--g-border) 75%);
-    background-size: 200% 100%;
-    animation: skeleton-shimmer 1.4s ease-in-out infinite;
-    vertical-align: middle;
+    animation: skel-shimmer 1.4s ease infinite;
+}
+@keyframes skel-shimmer {
+    0%   { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
+}
+.skel-row td { padding-top: 14px; padding-bottom: 14px; }
+
+/* =========================================================================
+   SMALL TEXT / SPACING UTILITIES
+   ========================================================================= */
+.text-sm { font-size: 12.5px; }
+.text-gray-500 { color: var(--g-text-muted); }
+.text-red-500 { color: var(--g-red); }
+.mr-1 { margin-right: 4px; }
+
+/* =========================================================================
+   SETTINGS — responsive two-column panel layout
+   =========================================================================
+   Plain "1fr 1.3fr" grid tracks don't actually prevent overflow — a grid
+   track's automatic minimum size is content-based ("auto"), not zero, so a
+   wide <select>/<input> inside can force the whole row wider than its
+   column and the page grows a horizontal scrollbar. minmax(0, ...) fixes
+   that, and the breakpoint stacks to one column entirely on narrow screens
+   instead of squeezing two columns into no space. */
+.settings-two-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+    gap: 24px;
+    align-items: start;
+}
+@media (max-width: 1000px) {
+    .settings-two-col { grid-template-columns: minmax(0, 1fr); }
 }
 
-.skel-circle {
-    border-radius: 50%;
-    flex-shrink: 0;
+.settings-form-row {
+    display: grid;
+    grid-template-columns: 60px repeat(3, minmax(0, 1fr)) auto;
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: end;
+}
+@media (max-width: 720px) {
+    .settings-form-row { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
 }
 
-.skel-row td {
-    padding: 14px 16px;
+/* Visually hidden but still present for screen readers/document structure —
+   used where a heading needs to exist semantically without being shown
+   twice on screen (e.g. settings pages, where the top bar already shows
+   the page name). */
+.sr-only {
+    position: absolute; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* =========================================================================
+   MISC FORM ELEMENTS
+   ========================================================================= */
+.sla-work-day, .ticket-checkbox {
+    accent-color: var(--g-blue);
+    width: 16px; height: 16px;
+    cursor: pointer;
+}
+
+/* =========================================================================
+   TICKET CONSOLE — priority & SLA urgency badges
+   =========================================================================
+   Priority and SLA state are the two things a person scanning a queue needs
+   to catch before reading anything else, so both get color + shape instead
+   of plain text. */
+.priority-chip {
+    display: inline-flex; align-items: center;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 100px;
+}
+.priority-chip.priority-high   { background: var(--g-red-bg);    color: var(--g-red); }
+.priority-chip.priority-medium { background: var(--g-yellow-bg); color: var(--g-yellow); }
+.priority-chip.priority-low    { background: var(--g-background); color: var(--g-text-muted); }
+
+.sla-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; color: var(--g-text-muted);
+}
+.sla-chip .sla-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--g-border); }
+.sla-chip.sla-ok .sla-dot    { background: var(--g-green); }
+.sla-chip.sla-warn { color: var(--g-yellow); font-weight: 600; }
+.sla-chip.sla-warn .sla-dot  { background: var(--g-yellow); }
+.sla-chip.sla-breach { color: var(--g-red); font-weight: 700; }
+.sla-chip.sla-breach .sla-dot { background: var(--g-red); }
+
+/* =========================================================================
+   TICKET DETAIL — grouped primary actions
+   =========================================================================
+   Reply / Acknowledge / Resolve / Pause-Resume SLA / Close all live in one
+   visually-grouped row, separated from the reference chips above and the
+   description below — proximity signaling "these are the things you can DO
+   to this ticket," as opposed to "things that describe this ticket." */
+.detail-action-bar {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 12px;
+    margin-bottom: 20px;
+    background: var(--g-background);
+    border: 1px solid var(--g-border);
+    border-radius: 12px;
+}
+.detail-action-bar:empty { display: none; }
+.detail-action-bar .g-btn { height: 36px; font-size: 13px; }
+
+/* =========================================================================
+   TICKET DETAIL — live collision-detection banner
+   ========================================================================= */
+.collision-banner {
+    align-items: center; gap: 10px;
+    font-size: 13px; line-height: 1.4;
+    color: var(--g-yellow);
+    background: var(--g-yellow-bg);
+    border: 1px solid var(--g-yellow);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 12px 0 4px;
+}
+.collision-banner .material-symbols-rounded { font-size: 18px; }
+
+/* =========================================================================
+   SETTINGS — panel card
+   =========================================================================
+   Each Access Management destination now has its own sidebar entry, so
+   navigation between them lives there only — this card just wraps whichever
+   panel's content is currently showing. */
+.settings-panel-card {
+    background: var(--g-surface);
+    border: 1px solid var(--g-border);
+    border-radius: var(--radius-lg, 20px);
+    padding: 24px 28px 28px;
+}
+
+/* =========================================================================
+   SEGMENTED CONTROL — e.g. the volume-trend 7d/30d/90d period toggle
+   ========================================================================= */
+.segmented-control {
+    display: inline-flex; gap: 2px;
+    background: var(--g-background);
+    border: 1px solid var(--g-border);
+    border-radius: 100px;
+    padding: 2px;
+}
+.segmented-option {
+    border: none; background: transparent;
+    padding: 5px 14px; font-size: 12px; font-weight: 500;
+    font-family: var(--font-ui); color: var(--g-text-muted);
+    border-radius: 100px; cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.segmented-option:hover { color: var(--g-text-main); }
+.segmented-option.active {
+    background: var(--g-surface); color: var(--g-blue-dark); font-weight: 600;
+    box-shadow: var(--shadow-sm, 0 2px 8px rgba(3,4,94,0.06));
+}
+.segmented-option:focus-visible { outline: 2px solid var(--g-blue); outline-offset: 2px; }
+
+/* =========================================================================
+   CHART EMPTY STATE — shown instead of a silently blank/stale canvas
+   ========================================================================= */
+.chart-empty-state {
+    display: none;
+    position: absolute; inset: 28px;
+    flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    text-align: center;
+    color: var(--g-text-faint);
+    font-size: 13.5px;
+}
+.chart-empty-state .material-symbols-rounded { font-size: 32px; opacity: 0.5; }
+
+/* =========================================================================
+   NOTIFICATION PANEL
+   =========================================================================
+   .notif-row was applied by notifications.js on every row but had no CSS
+   definition anywhere — no padding rhythm, no hover/focus state, no visual
+   difference for unread beyond a small dot. Rows are now clickable (they
+   navigate to the related ticket), so they need to look clickable too. */
+.notif-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--g-border);
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+.notif-row:last-child { border-bottom: none; }
+.notif-row:hover { background: var(--g-background); }
+.notif-row:focus-visible { outline: 2px solid var(--g-blue); outline-offset: -2px; }
+.notif-row.unread { background: var(--g-blue-light); }
+.notif-row.unread:hover { background: var(--tm-cyan-200, #ade8f4); }
+
+/* =========================================================================
+   CATEGORY CARD — labeled sub-sections
+   =========================================================================
+   Sub-categories, escalation, and custom fields are three genuinely
+   different concerns that were previously visually identical (same tiny
+   label, same dashed divider) — the sub-category chips didn't even have a
+   label at all. Each now gets an icon + name, consistent with the section
+   label styling used elsewhere in the app. */
+.cat-section-label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--g-text-muted);
+    margin-bottom: 4px;
+}
+.cat-section-label .material-symbols-rounded { font-size: 15px; color: var(--g-blue-dark); }
+
+/* =========================================================================
+   TICKET DETAIL — attachment chips
+   =========================================================================
+   Previously styled with Tailwind utility classes (bg-blue-50, hover:bg-blue-100,
+   inline-flex, p-2, rounded-lg...) that don't exist anywhere in this project —
+   there's no Tailwind build here, so every one of those classes was a no-op
+   and attachments rendered as unstyled default links. */
+.attachment-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--g-blue-light); color: var(--g-blue-dark);
+    border-radius: 8px; padding: 8px 12px; margin: 0 6px 6px 0;
+    font-size: 13px; font-weight: 500; text-decoration: none;
+    transition: background-color 0.15s ease;
+}
+.attachment-chip:hover { background: var(--tm-cyan-200, #ade8f4); }
+.attachment-chip .material-symbols-rounded { font-size: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+    .skel { animation: none; }
 }

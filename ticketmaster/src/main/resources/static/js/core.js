@@ -101,6 +101,8 @@ async function logout() {
 let ticketIdPendingResolve = null;
 let currentTickets = [];
 let currentDetailTicketId = null;
+let currentDetailTicket = null; // full ticket object for the open detail modal — avoids
+// relying on the (paginated, sometimes-stale) currentTickets array
 let presenceHeartbeatInterval = null;
 let consoleCurrentPage = 0;
 let allUsers = [];
@@ -115,8 +117,27 @@ let mainChartInstance = null;
 let volumeChartInstance = null;
 let activeVolumeDays = 30;
 let activeChartTab = 'status';
+let activeRangePreset = 'all'; // 7 | 30 | 'all' | null (null = custom manual dates)
 
-function switchView(viewId, el) {
+// Clicking "Operations Console" when you're already there should toggle the
+// sub-menu closed, not just re-open it every time — previously there was no
+// way to collapse it back without navigating away first.
+function handleConsoleNavClick(el) {
+    const alreadyOnConsole = document.getElementById('viewConsole').classList.contains('active-view');
+    const isCollapsed = document.querySelector('.md-nav-drawer')?.classList.contains('nav-collapsed');
+
+    if (alreadyOnConsole && !isCollapsed) {
+        const subMenu = document.getElementById('consoleSubMenu');
+        const chevron = document.getElementById('consoleSubChevron');
+        const isOpen = subMenu && subMenu.style.display === 'block';
+        if (subMenu) subMenu.style.display = isOpen ? 'none' : 'block';
+        if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+        return;
+    }
+    switchView('viewConsole', el);
+}
+
+function switchView(viewId, el, settingsTab) {
     document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active-view'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById(viewId).classList.add('active-view');
@@ -162,7 +183,7 @@ function switchView(viewId, el) {
         loadVolumeTrend(30);
     }
     if (viewId === 'viewSettings') {
-        switchSettingsTab('tabUsers');
+        switchSettingsTab(settingsTab || 'tabUsers');
     }
 }
 
@@ -217,7 +238,7 @@ function showMgmtMsg(elId, text, isError) {
     if (!box) return;
     box.style.display = 'block';
     box.style.background = isError ? '#FCE8E6' : '#E6F4EA';
-    box.style.color = isError ? '#EA4335' : '#34A853';
+    box.style.color = isError ? 'var(--g-red)' : 'var(--g-green)';
     box.innerText = text;
     setTimeout(() => { box.style.display = 'none'; }, 4000);
 }

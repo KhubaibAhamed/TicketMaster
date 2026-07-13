@@ -82,6 +82,21 @@ async function refreshDataPipeline() {
     } catch (e) { console.error("Pipeline Sync Error:", e); }
 }
 
+// Shared with ticket-detail.js — one urgency-badge language across the whole app.
+function buildSlaChipHtml(t) {
+    if (t.slaBreached) {
+        return `<span class="sla-chip sla-breach"><span class="sla-dot"></span>Breached</span>`;
+    }
+    if (t.slaDueDate) {
+        const due = new Date(t.slaDueDate);
+        const hoursLeft = (due.getTime() - Date.now()) / 3600000;
+        const dueLabel = due.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const urgency = hoursLeft <= 4 ? 'sla-warn' : 'sla-ok';
+        return `<span class="sla-chip ${urgency}"><span class="sla-dot"></span>${dueLabel}</span>`;
+    }
+    return `<span class="sla-chip sla-none"><span class="sla-dot"></span>No SLA set</span>`;
+}
+
 function renderTable(tickets) {
     const tbody = document.getElementById('ticketTableBody');
     if (!tbody) return;
@@ -112,12 +127,16 @@ function renderTable(tickets) {
         else if (t.status === 'IN_PROGRESS') statusClass += ' chip-progress';
         else if (t.status === 'RESOLVED') statusClass += ' chip-resolved';
 
-        let slaText = '<span style="color:var(--g-text-muted);">No SLA Set</span>';
-        if (t.slaBreached) slaText = '<span style="color:var(--g-red); font-weight:600;">BREACHED</span>';
-        else if (t.slaDueDate) slaText = new Date(t.slaDueDate).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
-
         let categoryName = t.category && t.category.name ? escapeHtml(t.category.name) : 'Uncategorized';
-        let priorityStyle = t.priority === 'HIGH' ? 'color: var(--g-red); font-weight: 600;' : 'color: var(--g-text-muted);';
+
+        // --- Priority: a real badge, not just colored text — the eye should
+        // land on HIGH-priority rows before it reads a single word. ---
+        const priorityClass = t.priority === 'HIGH' ? 'priority-high' : t.priority === 'MEDIUM' ? 'priority-medium' : 'priority-low';
+        const priorityHtml = `<span class="priority-chip ${priorityClass}">${t.priority || 'LOW'}</span>`;
+
+        // --- SLA: color-coded urgency instead of a bare date, so "at risk"
+        // is visible at a glance across a whole page of rows. ---
+        const slaHtml = buildSlaChipHtml(t);
 
         let actionBtn = `<span style="color: var(--g-text-muted); font-size:12px;">Closed</span>`;
         if (['NEW', 'OPEN'].includes(t.status)) {
@@ -144,9 +163,9 @@ function renderTable(tickets) {
             <td style="color: var(--g-blue); font-weight: 500; cursor: pointer;" onclick="openTicketDetail(${t.id})">#${t.id}</td>
             <td style="font-weight: 500; color: var(--g-text-main); max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(t.title)}</td>
             <td><span style="font-size: 12px; border: 1px solid var(--g-border); padding: 2px 6px; border-radius: 4px; color: var(--g-text-muted);">${categoryName}</span></td>
-            <td style="${priorityStyle}">${t.priority}</td>
+            <td>${priorityHtml}</td>
             <td><span class="${statusClass}">${t.status}</span></td>
-            <td>${slaText}</td>
+            <td>${slaHtml}</td>
             <td style="text-align: right;">${actionBtn}</td>
         `;
         tbody.appendChild(tr);
@@ -227,6 +246,9 @@ function applyFilters() {
     const priority   = document.getElementById('filterPriority')?.value || '';
     const categoryId = document.getElementById('filterCategory')?.value || '';
     const q          = document.getElementById('ticketSearch')?.value?.trim() || '';
+
+    if (q) rememberRecentSearch(q);
+    hideSearchSuggestions();
 
     const activeCount = [status, priority, categoryId].filter(v => v !== '').length;
     const countBadge  = document.getElementById('activeFilterCount');
@@ -426,3 +448,83 @@ async function applyBulkAction() {
         console.error('Bulk update failed:', e);
     }
 }
+
+// =========================================================================
+// SEARCH SUGGESTIONS — the search bar remembers your last few searches
+// instead of being a dead-end box you have to type into from scratch
+// every time. Purely client-side (localStorage), no backend involved.
+// =========================================================================
+const RECENT_SEARCH_KEY = 'tm_recent_ticket_searches';
+const RECENT_SEARCH_MAX = 6;
+
+function getRecentSearches() {
+    try {
+        return JSON.parse(localStorage.getItem(RECENT_SEARCH_KEY) || '[]');
+    } catch (e) { return []; }
+}
+
+function rememberRecentSearch(term) {
+    if (!term) return;
+    let list = getRecentSearches().filter(t => t.toLowerCase() !== term.toLowerCase());
+    list.unshift(term);
+    list = list.slice(0, RECENT_SEARCH_MAX);
+    localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list));
+}
+
+function clearRecentSearches(e) {
+    e.stopPropagation();
+    localStorage.removeItem(RECENT_SEARCH_KEY);
+    renderSearchSuggestions();
+}
+
+function runRecentSearch(term) {
+    const input = document.getElementById('ticketSearch');
+    input.value = term;
+    hideSearchSuggestions();
+    applyFilters();
+}
+
+function showSearchSuggestions() {
+    renderSearchSuggestions();
+    document.getElementById('searchSuggestPanel')?.classList.add('open');
+    document.getElementById('ticketSearch')?.setAttribute('aria-expanded', 'true');
+}
+
+function hideSearchSuggestions() {
+    document.getElementById('searchSuggestPanel')?.classList.remove('open');
+    document.getElementById('ticketSearch')?.setAttribute('aria-expanded', 'false');
+}
+
+function renderSearchSuggestions() {
+    const panel = document.getElementById('searchSuggestPanel');
+    if (!panel) return;
+    const recent = getRecentSearches();
+
+    if (recent.length === 0) {
+        panel.innerHTML = `<div class="search-suggest-empty">Your recent searches will show up here.</div>`;
+        return;
+    }
+
+    panel.innerHTML = `
+        <div class="search-suggest-label">Recent searches</div>
+        ${recent.map(term => `
+            <div class="search-suggest-item" onmousedown="event.preventDefault(); runRecentSearch('${escapeHtml(term).replace(/'/g, "\\'")}')">
+                <span class="material-symbols-rounded" aria-hidden="true">history</span>
+                <span>${escapeHtml(term)}</span>
+            </div>
+        `).join('')}
+        <button type="button" class="search-suggest-clear" onmousedown="event.preventDefault();" onclick="clearRecentSearches(event)">Clear recent searches</button>
+    `;
+}
+
+// Close the panel on outside click, and on Escape while the search input is focused.
+document.addEventListener('click', (e) => {
+    const searchBar = document.getElementById('ticketSearch')?.closest('.search-bar');
+    if (searchBar && !searchBar.contains(e.target)) hideSearchSuggestions();
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.activeElement?.id === 'ticketSearch') {
+        hideSearchSuggestions();
+        document.activeElement.blur();
+    }
+});

@@ -22,13 +22,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const user = localStorage.getItem('jwt_username');
     if (user) document.getElementById('userAvatar').innerText = user.charAt(0).toUpperCase();
 
+    // Personalized dashboard greeting — turns "admin_user" into "Admin User"
+    // rather than showing the raw login handle.
+    const greetingEl = document.getElementById('dashboardGreeting');
+    if (greetingEl && user) {
+        const displayName = user.split(/[_\s]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        greetingEl.innerText = `Hello, ${displayName} 👋`;
+    }
+
     // 4. Role-Based Access Control (Admin Reveal)
     const role = localStorage.getItem('jwt_role');
     if (role === 'ADMIN') {
-        const reportsNav    = document.getElementById('reportsNavItem');
-        const accessMgmtNav = document.getElementById('accessMgmtNavItem');
-        if (reportsNav)    reportsNav.style.display    = 'flex';
-        if (accessMgmtNav) accessMgmtNav.style.display = 'flex';
+        const reportsNav          = document.getElementById('reportsNavItem');
+        const ticketOpsNav        = document.getElementById('ticketOpsNavGroup');
+        const identityAccessNav   = document.getElementById('identityAccessNavGroup');
+        if (reportsNav)        reportsNav.style.display        = 'flex';
+        if (ticketOpsNav)      ticketOpsNav.style.display      = 'block';
+        if (identityAccessNav) identityAccessNav.style.display = 'block';
     }
     if (role === 'DEVELOPER') {
         const widget = document.getElementById('devPersonalWidget');
@@ -40,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (myReqNav) myReqNav.style.display = 'flex';
 
         // Hide all nav items except Raise New Incident and My Requests
-        const hideLabels = ['Dashboard Overview', 'Operations Console', 'Reports', 'Access Management'];
+        const hideLabels = ['Dashboard Overview', 'Operations Console', 'Reports', 'Ticket Operations', 'Identity & Access'];
         document.querySelectorAll('.nav-item').forEach(item => {
             const label = item.querySelector('.nav-label');
             if (label && hideLabels.includes(label.innerText.trim())) {
@@ -48,9 +58,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Also hide the console sub-menu group entirely for USER
+        // Also hide the console sub-menu group and the two settings nav groups entirely for USER
         const consoleGroup = document.getElementById('consoleNavGroup');
         if (consoleGroup) consoleGroup.style.display = 'none';
+        const ticketOpsGroup = document.getElementById('ticketOpsNavGroup');
+        if (ticketOpsGroup) ticketOpsGroup.style.display = 'none';
+        const identityAccessGroup = document.getElementById('identityAccessNavGroup');
+        if (identityAccessGroup) identityAccessGroup.style.display = 'none';
 
         // Boot into My Requests (console locked to current user's tickets)
         setMyRequestsMode();
@@ -150,7 +164,7 @@ document.addEventListener('keydown', (e) => {
     switch (key) {
         case 'n':
             e.preventDefault();
-            document.getElementById('createModal')?.showModal();
+            openCreateModal();
             break;
 
         case 'escape':

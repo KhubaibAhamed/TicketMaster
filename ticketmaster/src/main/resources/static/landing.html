@@ -3,108 +3,268 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ticketmaster Enterprise</title>
-    <link rel="stylesheet" href="/css/styles.css">
-    <style>
-        .nav-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 24px 40px;
-            position: absolute;
-            top: 0; left: 0; width: 100%;
-        }
-
-        .logo-area {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-family: var(--font-display);
-            font-size: 22px;
-            font-weight: 500;
-            color: var(--g-text-main);
-            text-decoration: none;
-        }
-
-        .hero-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            text-align: center;
-            padding: 0 24px;
-        }
-
-        .hero-title {
-            font-size: clamp(3rem, 7vw, 5.5rem);
-            font-weight: 400;
-            letter-spacing: -0.04em; /* The Google Display Type signature */
-            line-height: 1.05;
-            color: var(--g-text-main);
-            margin-bottom: 24px;
-            max-width: 900px;
-            animation: slideUpFade 1s cubic-bezier(0.2, 0, 0, 1) forwards;
-        }
-
-        .text-gradient {
-            background: linear-gradient(100deg, var(--g-blue) 0%, #A142F4 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .hero-subtitle {
-            font-size: 20px;
-            color: var(--g-text-muted);
-            max-width: 600px;
-            line-height: 1.6;
-            margin-bottom: 48px;
-            animation: slideUpFade 1s cubic-bezier(0.2, 0, 0, 1) 0.1s forwards;
-            opacity: 0;
-        }
-
-        .cta-container {
-            animation: slideUpFade 1s cubic-bezier(0.2, 0, 0, 1) 0.2s forwards;
-            opacity: 0;
-        }
-
-        .g-btn-large {
-            height: 56px;
-            padding: 0 36px;
-            font-size: 16px;
-        }
-
-        @keyframes slideUpFade {
-            from { opacity: 0; transform: translateY(40px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-    </style>
+    <title>TrackTicket — IT Service Management That Meets Its Own Deadlines</title>
+    <meta name="description" content="Business-hours SLA enforcement, AI-assisted triage, and escalation that actually escalates. The help desk built for teams who take their SLAs seriously.">
+    <link rel="icon" type="image/png" href="/images/logo.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0">
+    <link rel="stylesheet" href="/css/brand.css">
 </head>
-<body>
+<body class="tm-scope">
 
-<div class="ethereal-bg"></div>
-
-<nav class="nav-bar">
-    <a href="#" class="logo-area">
-        <span class="material-symbols-rounded" style="color: var(--g-blue); font-size: 28px;">confirmation_number</span>
-        Ticketmaster
+<!-- ============ NAV ============ -->
+<nav class="tm-nav">
+    <a href="#" class="tm-nav-logo">
+        <img src="/images/logo.png" alt="TrackTicket logo"
+             onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 30 30%22%3E%3Ccircle cx=%2215%22 cy=%2215%22 r=%2215%22 fill=%22%23023e8a%22/%3E%3Crect x=%227%22 y=%2211%22 width=%2216%22 height=%229%22 rx=%222%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%221.5%22/%3E%3C/svg%3E';">
+        TrackTicket
     </a>
-    <div style="display: flex; gap: 8px;">
-        <button class="g-btn g-btn-text" onclick="window.location.href='/login.html'">Sign in</button>
-        <button class="g-btn g-btn-primary" onclick="window.location.href='/login.html'">Try Ticketmaster</button>
+    <div class="tm-nav-links">
+        <a href="#product">Product</a>
+        <a href="#story">Our story</a>
+        <a href="#security">Security</a>
+        <a href="#pricing">Pricing</a>
+    </div>
+    <div class="tm-nav-actions">
+        <a href="/login.html" class="tm-btn tm-btn-ghost">Sign in</a>
+        <a href="/login.html" class="tm-btn tm-btn-primary">Start free</a>
     </div>
 </nav>
 
-<main class="hero-section">
-    <h1 class="hero-title">Service management, <br><span class="text-gradient">reimagined.</span></h1>
-    <p class="hero-subtitle">Automated routing, strict SLA enforcement, and a pristine workspace. Your IT infrastructure, handled effortlessly.</p>
-
-    <div class="cta-container">
-        <button class="g-btn g-btn-primary g-btn-large" onclick="window.location.href='/login.html'">
-            Go to Workspace
-        </button>
+<!-- ============ HERO ============ -->
+<header class="tm-hero">
+    <div>
+        <span class="tm-eyebrow"><span class="dot"></span> Business-hours SLA enforcement, built in</span>
+        <h1 class="tm-hero-title">Every ticket. <span class="accent">Answered on time.</span></h1>
+        <p class="tm-hero-subtitle">
+            TrackTicket routes every ticket to the right person, escalates itself the moment it's at risk,
+            and stops counting against you the second your team clocks out. No configuration marathon required.
+        </p>
+        <div class="tm-hero-ctas">
+            <a href="/login.html" class="tm-btn tm-btn-primary tm-btn-lg">Start free</a>
+            <a href="#product" class="tm-btn tm-btn-ghost tm-btn-lg">See how it works</a>
+        </div>
+        <p class="tm-hero-microcopy">No credit card. Set up in minutes, not a sales cycle.</p>
     </div>
-</main>
+
+    <div class="tm-mockup-wrap">
+        <!-- Hero illustration: agent resolving a ticket, told in the brand's blue scale -->
+        <svg class="tm-hero-illustration" viewBox="0 0 460 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of a support agent resolving a ticket at a desk">
+            <ellipse cx="230" cy="390" rx="170" ry="16" fill="#E4F3FA"/>
+            <circle cx="230" cy="160" r="150" fill="#F3FAFD"/>
+            <rect x="70" y="300" width="320" height="14" rx="4" fill="#023e8a"/>
+            <rect x="90" y="314" width="14" height="60" fill="#03045e"/>
+            <rect x="356" y="314" width="14" height="60" fill="#03045e"/>
+            <rect x="150" y="180" width="160" height="112" rx="10" fill="#ffffff" stroke="#023e8a" stroke-width="4"/>
+            <rect x="210" y="292" width="40" height="16" fill="#023e8a"/>
+            <rect x="190" y="308" width="80" height="8" rx="4" fill="#023e8a"/>
+            <rect x="168" y="196" width="124" height="80" rx="6" fill="#E4F3FA"/>
+            <rect x="180" y="208" width="70" height="8" rx="4" fill="#00b4d8"/>
+            <rect x="180" y="224" width="100" height="6" rx="3" fill="#90e0ef"/>
+            <rect x="180" y="236" width="90" height="6" rx="3" fill="#90e0ef"/>
+            <rect x="180" y="254" width="46" height="14" rx="7" fill="#0F6B2C" opacity="0.85"/>
+            <circle cx="120" cy="230" r="26" fill="#0077b6"/>
+            <rect x="98" y="252" width="44" height="60" rx="18" fill="#0096c7"/>
+            <rect x="132" y="262" width="46" height="12" rx="6" fill="#0096c7"/>
+            <g>
+                <rect x="330" y="120" width="86" height="40" rx="10" fill="#ffffff" stroke="#ade8f4" stroke-width="2"/>
+                <circle cx="346" cy="140" r="6" fill="#00b4d8"/>
+                <rect x="358" y="132" width="46" height="6" rx="3" fill="#023e8a"/>
+                <rect x="358" y="144" width="34" height="6" rx="3" fill="#90e0ef"/>
+            </g>
+            <g>
+                <rect x="30" y="150" width="80" height="38" rx="10" fill="#ffffff" stroke="#ade8f4" stroke-width="2"/>
+                <circle cx="46" cy="169" r="6" fill="#0F6B2C"/>
+                <rect x="58" y="162" width="42" height="6" rx="3" fill="#023e8a"/>
+                <rect x="58" y="173" width="30" height="6" rx="3" fill="#90e0ef"/>
+            </g>
+        </svg>
+    </div>
+</header>
+
+<!-- ============ TRUST BAR ============ -->
+<section class="tm-trust-bar" id="security">
+    <div class="tm-trust-chip"><span class="material-symbols-rounded" aria-hidden="true">lock</span> TOTP 2FA</div>
+    <div class="tm-trust-chip"><span class="material-symbols-rounded" aria-hidden="true">schedule</span> Business-hours SLA engine</div>
+    <div class="tm-trust-chip"><span class="material-symbols-rounded" aria-hidden="true">history_edu</span> Full audit log</div>
+    <div class="tm-trust-chip"><span class="material-symbols-rounded" aria-hidden="true">bolt</span> Auto-escalation</div>
+    <div class="tm-trust-chip"><span class="material-symbols-rounded" aria-hidden="true">webhook</span> Slack & Discord webhooks</div>
+</section>
+
+<!-- ============ OUR STORY ============ -->
+<section class="tm-section tm-reveal" id="story">
+    <div class="tm-story">
+        <div>
+            <span class="tm-story-eyebrow">WHO WE ARE</span>
+            <h2 class="tm-story-title">Built by people who were tired of watching SLAs slip.</h2>
+            <p class="tm-story-copy">
+                TrackTicket started as a simple question: why does every help desk celebrate response times
+                on a slide, then quietly miss them in practice? We set out to build the tool we wished we had —
+                one where the deadline is enforced by the system, not remembered by a person.
+            </p>
+            <p class="tm-story-copy">
+                Small and mid-size IT and ops teams are our home turf. No bloated setup, no dedicated
+                administrator required — just a help desk that keeps its own promises.
+            </p>
+        </div>
+        <svg class="tm-story-illustration" viewBox="0 0 440 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Illustration of two teammates collaborating around a shared ticket board">
+            <ellipse cx="220" cy="360" rx="160" ry="14" fill="#E4F3FA"/>
+            <rect x="120" y="40" width="200" height="150" rx="12" fill="#ffffff" stroke="#023e8a" stroke-width="4"/>
+            <rect x="140" y="60" width="50" height="60" rx="6" fill="#caf0f8"/>
+            <rect x="195" y="60" width="50" height="90" rx="6" fill="#ade8f4"/>
+            <rect x="250" y="60" width="50" height="40" rx="6" fill="#90e0ef"/>
+            <rect x="140" y="128" width="50" height="42" rx="6" fill="#e4f3fa"/>
+            <rect x="250" y="108" width="50" height="62" rx="6" fill="#e4f3fa"/>
+            <circle cx="110" cy="230" r="28" fill="#023e8a"/>
+            <rect x="84" y="256" width="52" height="80" rx="20" fill="#0077b6"/>
+            <circle cx="330" cy="230" r="28" fill="#0096c7"/>
+            <rect x="304" y="256" width="52" height="80" rx="20" fill="#00b4d8"/>
+            <rect x="182" y="248" width="76" height="46" rx="8" fill="#ffffff" stroke="#0077b6" stroke-width="3"/>
+            <rect x="192" y="260" width="40" height="6" rx="3" fill="#023e8a"/>
+            <rect x="192" y="272" width="56" height="6" rx="3" fill="#90e0ef"/>
+            <circle cx="240" cy="284" r="6" fill="#0F6B2C"/>
+            <rect x="370" y="300" width="10" height="36" rx="3" fill="#023e8a"/>
+            <ellipse cx="375" cy="296" rx="18" ry="10" fill="#48cae4"/>
+            <ellipse cx="362" cy="288" rx="14" ry="8" fill="#00b4d8"/>
+            <ellipse cx="388" cy="288" rx="14" ry="8" fill="#0096c7"/>
+        </svg>
+    </div>
+</section>
+
+<!-- ============ OUTCOMES (indirect confidence — no named comparisons) ============ -->
+<section class="tm-section tm-reveal" id="product" style="background: var(--tm-bg-alt); max-width: 100%; padding-left: 0; padding-right: 0;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 48px;">
+        <div class="tm-section-head">
+            <span class="tm-section-eyebrow">WHAT CHANGES</span>
+            <h2 class="tm-section-title">Nothing falls through. Nothing sits idle.</h2>
+            <p class="tm-section-sub">Not a longer feature list — the handful of things that actually change how your team's week feels.</p>
+        </div>
+        <div class="tm-outcomes">
+            <div class="tm-outcome-card">
+                <div class="tm-outcome-icon"><span class="material-symbols-rounded" aria-hidden="true">bedtime</span></div>
+                <div class="tm-outcome-title">Nights and weekends don't count against you</div>
+                <div class="tm-outcome-desc">SLA clocks run on your team's actual working hours. A ticket filed Friday evening doesn't quietly breach by Saturday morning.</div>
+            </div>
+            <div class="tm-outcome-card">
+                <div class="tm-outcome-icon"><span class="material-symbols-rounded" aria-hidden="true">route</span></div>
+                <div class="tm-outcome-title">The right agent, automatically</div>
+                <div class="tm-outcome-desc">Tickets route to whoever's actually free, not whoever an admin remembered to check on. No manual triage queue.</div>
+            </div>
+            <div class="tm-outcome-card">
+                <div class="tm-outcome-icon"><span class="material-symbols-rounded" aria-hidden="true">bolt</span></div>
+                <div class="tm-outcome-title">A breach doesn't just get logged</div>
+                <div class="tm-outcome-desc">The moment a ticket's at risk, priority bumps and the right person gets pinged — automatically, before it becomes a bigger problem.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ FEATURE BENTO ============ -->
+<section class="tm-section tm-reveal">
+    <div class="tm-section-head">
+        <span class="tm-section-eyebrow">UNDER THE HOOD</span>
+        <h2 class="tm-section-title">Every feature earns its place.</h2>
+    </div>
+    <div class="tm-bento">
+        <div class="tm-bento-card span-4">
+            <span class="tm-bento-icon"><span class="material-symbols-rounded" aria-hidden="true">smart_toy</span></span>
+            <div>
+                <div class="tm-bento-title">AI-Assisted Triage</div>
+                <div class="tm-bento-desc">Summarizes long tickets, drafts a reply grounded in your own team's past resolutions, and flags likely duplicates — before an agent even opens the ticket.</div>
+            </div>
+        </div>
+        <div class="tm-bento-card">
+            <span class="tm-bento-icon"><span class="material-symbols-rounded" aria-hidden="true">groups</span></span>
+            <div>
+                <div class="tm-bento-title">Collision Detection</div>
+                <div class="tm-bento-desc">See who else is viewing a ticket, live — before two agents work the same fix twice.</div>
+            </div>
+        </div>
+        <div class="tm-bento-card">
+            <span class="tm-bento-icon"><span class="material-symbols-rounded" aria-hidden="true">auto_stories</span></span>
+            <div>
+                <div class="tm-bento-title">Knowledge Base Deflection</div>
+                <div class="tm-bento-desc">Related articles surface while someone's still typing — solved before it's even filed.</div>
+            </div>
+        </div>
+        <div class="tm-bento-card">
+            <span class="tm-bento-icon"><span class="material-symbols-rounded" aria-hidden="true">route</span></span>
+            <div>
+                <div class="tm-bento-title">Skill-Based Auto-Assignment</div>
+                <div class="tm-bento-desc">Routes to the least-loaded qualified agent automatically.</div>
+            </div>
+        </div>
+        <div class="tm-bento-card">
+            <span class="tm-bento-icon"><span class="material-symbols-rounded" aria-hidden="true">lock</span></span>
+            <div>
+                <div class="tm-bento-title">2FA, Included</div>
+                <div class="tm-bento-desc">Standard TOTP, works with any authenticator app.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="tm-cta-final tm-reveal" id="pricing">
+    <h2 class="tm-section-title" style="margin-bottom: 14px;">Set up in minutes. Judge it in a week.</h2>
+    <p class="tm-section-sub" style="margin-bottom: 32px;">Free to start. No card, no sales call, no configuration marathon.</p>
+    <a href="/login.html" class="tm-btn tm-btn-primary tm-btn-lg">Start free</a>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer class="tm-footer">
+    <div class="tm-footer-inner">
+        <div class="tm-footer-brand">
+            <a href="#" class="tm-nav-logo"><img src="/images/logo.png" alt="TrackTicket logo"
+                                                 onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 30 30%22%3E%3Ccircle cx=%2215%22 cy=%2215%22 r=%2215%22 fill=%22%23023e8a%22/%3E%3Crect x=%227%22 y=%2211%22 width=%2216%22 height=%229%22 rx=%222%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%221.5%22/%3E%3C/svg%3E';"> TrackTicket</a>
+            <p>The help desk that enforces its own SLAs — built for small and mid-size IT and ops teams.</p>
+            <div class="tm-footer-social">
+                <a href="#" aria-label="TrackTicket on X"><span class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;">tag</span></a>
+                <a href="#" aria-label="TrackTicket on LinkedIn"><span class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;">business_center</span></a>
+                <a href="#" aria-label="TrackTicket on GitHub"><span class="material-symbols-rounded" aria-hidden="true" style="font-size:18px;">code</span></a>
+            </div>
+        </div>
+        <div class="tm-footer-col">
+            <h4>Product</h4>
+            <a href="#product">Features</a>
+            <a href="#security">Security</a>
+            <a href="#pricing">Pricing</a>
+            <a href="/login.html">Sign in</a>
+        </div>
+        <div class="tm-footer-col">
+            <h4>Company</h4>
+            <a href="#story">Our story</a>
+            <a href="#">Careers</a>
+            <a href="#">Blog</a>
+            <a href="#">Contact us</a>
+        </div>
+        <div class="tm-footer-col">
+            <h4>Legal</h4>
+            <a href="#">Terms & Conditions</a>
+            <a href="#">Privacy Policy</a>
+            <a href="#">Support</a>
+        </div>
+    </div>
+    <div class="tm-footer-bottom">
+        <div>© <span id="year"></span> TrackTicket. All rights reserved.</div>
+        <div>Made for teams who take their SLAs seriously.</div>
+    </div>
+</footer>
+
+<script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+
+    const revealEls = document.querySelectorAll('.tm-reveal');
+    const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('tm-in');
+                io.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.15 });
+    revealEls.forEach(el => io.observe(el));
+</script>
 
 </body>
 </html>

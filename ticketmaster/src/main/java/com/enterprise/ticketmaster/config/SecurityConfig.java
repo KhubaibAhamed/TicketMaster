@@ -42,7 +42,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
 
                         // 1. PUBLIC FRONTEND ASSETS (Browsers cannot send JWTs for HTML/CSS files)
-                        .requestMatchers("/", "/css/**", "/js/**", "/landing.html", "/login.html", "/index.html", "/favicon.ico", "/error").permitAll()
+                        .requestMatchers("/","/images/**", "/css/**", "/js/**", "/landing.html", "/login.html", "/index.html", "/favicon.ico", "/error").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
 

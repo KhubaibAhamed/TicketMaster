@@ -1,174 +1,158 @@
-# Enterprise Ticket Management System
+# Ticketmaster : Enterprise Ticket Management System
 
-A full-stack IT helpdesk ticketing platform built with **Spring Boot 3** and **vanilla JavaScript**, featuring stateless JWT authentication with refresh tokens, role-based access control, an automated routing engine, and an SLA breach scheduler.
+A full-stack, enterprise-grade IT service management (ITSM) / help desk platform built from scratch in Java and Spring Boot, with a vanilla JS frontend, no frameworks, no build step. Designed to go feature-for-feature against tools like Zendesk, Freshdesk, and Jira Service Management, while staying free to run and simple to reason about.
 
----
-
-## Features
-
-- **Stateless JWT authentication :** 15-minute access tokens, 24-hour refresh tokens, with automatic silent refresh on the frontend
-- Role-based access control :  `DEVELOPER` and `ADMIN` roles enforced at the Spring Security filter chain level, not in business logic
-- **Ticket lifecycle management :**  create, view, filter, acknowledge, and resolve tickets, with full description history preserved through every status change
-- **Category management :**  admin-managed categories backed by a real database table and REST endpoint, not hardcoded frontend strings
-- **Automated routing engine :**  tickets are auto-assigned to a target queue based on category/priority rules, falling back to a default triage queue
-- **SLA breach scheduler :**  a background `@Scheduled` job sweeps for tickets that have missed their SLA deadline and flags them
-- **JPA auditing :**  `@CreatedDate`/`@LastModifiedDate` timestamps managed automatically, no manual bookkeeping
-- **Stored-XSS-safe rendering :**  all user-supplied ticket data is HTML-escaped before being rendered on the dashboard
-- **Admin user provisioning :**  admins can create, list, and remove `DEVELOPER`/`ADMIN` accounts through a dedicated Access Management panel
-- **Custom exception handling :**  a global `@ControllerAdvice` returns consistent, structured JSON error responses instead of raw Spring stack traces
-- **Continuous Integration :** GitHub Actions runs the full test suite against an in-memory H2 database on every push
+> **New to this codebase?** Read [`ARCHITECTURE.md`](./ARCHITECTURE.md) first, it's a 5-minute map of how the project is organized, which file owns which feature, and the conventions to follow before your first PR.
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Backend | Java 21, Spring Boot 3.3.4 |
-| Security | Spring Security, JWT (jjwt 0.12.6), BCrypt password hashing |
-| Persistence | Spring Data JPA, Hibernate, MySQL 8 (production), H2 in-memory (tests only) |
-| Validation | Jakarta Bean Validation (JSR-303) |
-| Frontend | HTML5, CSS3, Vanilla JavaScript (no frontend framework) |
-| Build | Maven |
-| CI | GitHub Actions |
+- **Backend:** Java 21, Spring Boot 3.3.4, Spring Security, Spring Data JPA
+- **Auth:** JWT (access + refresh tokens) via HttpOnly cookies, account lockout, password policy, optional TOTP-based 2FA
+- **Database:** MySQL 8 (H2 in-memory for CI)
+- **Frontend:** Vanilla JavaScript, HTML, CSS, no React/Vue/build tooling, split into feature-scoped files (see `static/js/`)
+- **Rate limiting:** Bucket4j
+- **CI:** GitHub Actions
+- **LLM (optional):** Groq API (free tier), OpenAI-compatible endpoint, used for AI-assisted triage
 
 ---
 
+## Project Structure
 
+```
+src/main/java/com/enterprise/ticketmaster/
+├── model/         JPA entities + DTOs (one class per file)
+├── repository/    Spring Data JPA interfaces
+├── service/       Business logic, start here when tracing behavior
+├── controller/    Thin REST layer
+├── event/         Notification event bus
+├── config/        Security, JWT, rate limiting
+└── exception/     Global exception handling
+
+src/main/resources/static/
+├── index.html         Main dashboard shell
+├── login.html         Sign-in page (separate from index.html/app scripts)
+└── js/
+    ├── core.js                        Shared auth helpers, global state, utilities, loads FIRST
+    ├── notifications.js                Notification bell
+    ├── dashboard-reports.js            Dashboard charts + Reports page
+    ├── tickets-console.js              Main ticket table: search/filter/sort/bulk actions
+    ├── ticket-create.js                "Raise Incident" form + AI suggestions + custom fields
+    ├── ticket-detail.js                Ticket detail modal (comments, SLA, AI triage, merge)
+    ├── settings-admin-security.js      Admin settings: users, security log, MFA, webhooks
+    ├── settings-sla-routing-kb.js      Admin settings: SLA, routing, canned responses, KB
+    └── shortcuts-init.js               Keyboard shortcuts + page bootstrap, loads LAST
+```
+
+Every package has its own `package-info.java`, and every JS file has a header comment explaining its scope and dependencies, full detail in `ARCHITECTURE.md`.
+
+---
+
+## Feature Overview
+
+### Core Ticketing
+- Full ticket lifecycle: create, assign, comment (public/internal), resolve, reopen, auto-close after 3 days
+- Role-based access: **ADMIN**, **DEVELOPER** (agent), **USER** (restricted requester/customer portal view)
+- Pagination, search/filtering, bulk operations (priority/category changes)
+- File attachments, ticket linking, audit history log (per-field change tracking)
+- Dark mode, keyboard shortcuts, loading skeletons
+
+### SLA Management
+- **Business-hours-aware SLA calendar:** admin-configurable work days/hours; SLA clocks pause outside business hours instead of running 24/7
+- SLA pause-on-pending (clock stops while waiting on the customer)
+- **Escalation policy on breach:** auto-bumps ticket priority one level and notifies a configurable per-category escalation contact (falls back to admin broadcast if none set)
+- Configurable per-priority SLA thresholds, all admin-editable without redeploy
+
+### Agent Productivity
+- **Canned responses / macros:** admin-managed reusable reply templates, insertable directly into any comment box
+- **Collision detection:** live "Agent X is also viewing this ticket" indicator (in-memory presence tracking, ~8s heartbeat)
+- **Skill/load-based auto-assignment:** routing rules can auto-pick the least-loaded eligible agent from a configured pool, reusing the existing workload calculation
+
+### Self-Service & Deflection
+- **Knowledge base module:** admin-authorable articles; live "Related articles" suggestions surface during ticket creation (keyword-overlap search) to deflect tickets before they're filed; one-click "Convert resolved ticket into KB article"
+- **CSAT survey:** one-click 1–5 star satisfaction rating emailed after resolution, with an admin summary card in Reports
+
+### AI-Assisted Triage (Groq-powered, free tier)
+- Auto-summarize long ticket descriptions for agents
+- Draft a suggested reply grounded in similar past resolved tickets
+- **Duplicate ticket detection** (keyword-overlap based) with one-click **merge**, closes the duplicate, links it to the primary ticket, and preserves both tickets' comment histories
+
+### Enterprise Readiness
+- **MFA / 2FA:** standard TOTP (RFC 6238), compatible with Google Authenticator/Authy, implemented with zero external dependencies (self-contained HMAC-SHA1 + Base32)
+- **Outbound webhooks:** Slack/Discord/generic JSON delivery on SLA breach, admin-managed, per-webhook enable/disable and test-send
+- **Ticket templates / custom fields per category:** admin-defined per-category fields (text/number/date/dropdown) rendered dynamically on the create-ticket form and shown on ticket detail
+- Externalized secrets, CORS hardening, password policy, account lockout, rate limiting (Bucket4j), full security event/audit log
+
+---
 
 ## Getting Started
 
-### Prerequisites
-- Java 21+
-- Maven 3.8+ (or use the included `./mvnw` wrapper)
-- MySQL 8+, running locally
+### Environment Variables
 
-### 1. Clone the repository
+Set these before running (IntelliJ: Run Configuration → Environment Variables), **never commit real values**:
 
-```bash
-git clone https://github.com/saicharanreddy01/enterprise-ticket-management-system.git
-cd enterprise-ticket-management-system/ticketmaster
+| Variable | Purpose                                                                                                                                                                                           |
+|---|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `JWT_SECRET` | Signing key for access/refresh tokens                                                                                                                                                             |
+| `MAIL_USERNAME` / `MAIL_PASSWORD` | SMTP credentials for outbound notification emails                                                                                                                                                 |
+| `MAIL_NOTIFY_EMAIL` | From-address for system emails                                                                                                                                                                    |
+| `GROQ_API_KEY` | *(optional)* Enables AI-assisted triage (summarize / suggest reply). Free tier at [console.groq.com](https://console.groq.com) : no card required. Everything else in the app works without this. |
+
+Relevant `application.properties` entries:
+```properties
+spring.jpa.hibernate.ddl-auto=update
+app.base-url=http://localhost:8080
+groq.api.key=${GROQ_API_KEY:}
+groq.model=llama-3.3-70b-versatile
 ```
 
-### 2. Create the database
-
-```sql
-CREATE DATABASE ticketmaster_db;
-```
-
-### 3. Set required environment variables
-
-This application reads its database password and JWT signing secret from environment variables — **nothing sensitive is stored in the repository.** Set these before running:
-
-| Variable | Description |
-|---|---|
-| `DB_PASSWORD` | Your local MySQL root (or dedicated app user) password |
-| `JWT_SECRET` | A random 256-bit secret, e.g. generate one with `openssl rand -hex 32` |
-
-In IntelliJ: **Run → Edit Configurations → Environment Variables**, and add both as `KEY=VALUE` pairs.
-
-### 4. Run the application
-
-```bash
-./mvnw spring-boot:run
-```
-
-The app starts at `http://localhost:8080`, which redirects to the landing page.
-
-### 5. Create your first account
-
-There is currently no seed data — the database starts empty, and new account registration itself requires an existing `ADMIN` account (`POST /api/auth/register` is `ADMIN`-only). To bootstrap your first admin, insert one directly into MySQL with a BCrypt-hashed password:
-
-```sql
--- Generate a BCrypt hash for your chosen password first (e.g. via https://bcrypt-generator.com,
--- or by temporarily calling PasswordEncoder.encode() in a scratch test), then:
-INSERT INTO users (username, password, role)
-VALUES ('admin', '<your-bcrypt-hash-here>', 'ADMIN');
-```
-
-Log in with that account, then use the **Access Management** panel in the dashboard to provision additional `DEVELOPER`/`ADMIN` accounts going forward — no further manual SQL needed.
+### Running Locally
+1. Set the environment variables above.
+2. Ensure a MySQL 8 instance is running and configured in `application.properties`.
+3. Run the Spring Boot app — schema updates apply automatically on boot (`ddl-auto=update`), no manual migrations needed.
+4. Open `http://localhost:8080`.
 
 ---
 
-## API Endpoints
+## Key Conventions
 
-All endpoints except `/api/auth/login` and `/api/auth/refresh` require a valid JWT in the `Authorization: Bearer <token>` header.
-
-| Method | Endpoint | Role Required | Description |
-|---|---|---|---|
-| `POST` | `/api/auth/login` | Public | Authenticate, receive access + refresh tokens |
-| `POST` | `/api/auth/refresh` | Public (valid refresh token) | Exchange a refresh token for a new access token |
-| `POST` | `/api/auth/register` | `ADMIN` | Provision a new user account |
-| `GET` | `/api/auth/users` | `ADMIN` | List all user accounts |
-| `DELETE` | `/api/auth/users/{id}` | `ADMIN` | Remove a user account |
-| `GET` | `/api/tickets` | Authenticated | Fetch all tickets |
-| `POST` | `/api/tickets` | Authenticated | Create a new ticket |
-| `GET` | `/api/tickets/status/{status}` | Authenticated | Filter tickets by status |
-| `PUT` | `/api/tickets/{id}` | Authenticated | Update a ticket |
-| `DELETE` | `/api/tickets/{id}` | `ADMIN` | Delete a ticket |
-| `GET` | `/api/categories` | Authenticated | List all categories |
-| `POST` | `/api/categories` | `ADMIN` | Create a new category |
-| `GET` | `/api/users/me` | Authenticated | Get current authenticated user's info |
-
-### Example: Create a ticket
-
-```http
-POST /api/tickets
-Authorization: Bearer <your-access-token>
-Content-Type: application/json
-
-{
-  "title": "Server RAM Upgrade Required",
-  "description": "Production server needs upgrade to 32GB to prevent throttling.",
-  "priority": "HIGH",
-  "category": { "id": 1 }
-}
-```
-
-### Example response
-
-```json
-{
-  "id": 1,
-  "title": "Server RAM Upgrade Required",
-  "description": "Production server needs upgrade to 32GB to prevent throttling.",
-  "status": "OPEN",
-  "priority": "HIGH",
-  "category": { "id": 1, "name": "Hardware" },
-  "raisedBy": "dev_user",
-  "assignedTo": "DEFAULT_TRIAGE_QUEUE",
-  "resolvedBy": null,
-  "slaDueDate": "2026-06-19T18:36:00",
-  "slaBreached": false,
-  "createdAt": "2026-06-19T14:36:00",
-  "updatedAt": "2026-06-19T14:36:00"
-}
-```
-
+- All auth uses HttpOnly cookies with `credentials: 'include'`; `localStorage` retains only `jwt_username` and `jwt_role`
+- `fetchWithAuth` (in `core.js`) handles silent token refresh via `/api/auth/refresh`, always use it instead of raw `fetch` for authenticated calls
+- Frontend files are loaded as classic `<script>` tags (no ES modules), all functions/state are global. `core.js` must load first, `shortcuts-init.js` must load last. See `index.html`'s script-tag comment block and `ARCHITECTURE.md` for why.
+- Native SQL queries can return `java.sql.Timestamp` instead of `LocalDateTime` depending on the JDBC driver, always normalize with an `instanceof` check rather than casting directly
+- CI uses GitHub Actions with H2 (`MODE=MySQL;NON_KEYWORDS=VALUE`); `EmailService` is `@ConditionalOnProperty`-gated so CI doesn't fail without real SMTP credentials
+- Presence tracking (collision detection) is in-memory and single-instance only, would need a shared store (Redis) if ever run behind a load balancer with multiple instances
 
 ---
 
-## Key Design Decisions
+## Roadmap Status
 
-- **3-layer architecture :**  Controller, Service, and Repository layers are kept strictly separate, following standard Spring conventions
-- **Stateless JWT over sessions :**  no server-side session state to manage or scale; short-lived access tokens limit the blast radius of a leaked token
-- **RBAC enforced at the security filter level :** role checks live in `SecurityConfig`, not scattered through business logic, so the permission model is auditable in one place
-- **Category resolved server-side from ID :**  the frontend sends a category `id`, and `TicketService` resolves it against the database before saving, preventing Hibernate from trying to silently create orphaned category rows
-- **Status semantics :**  `NEW` means unassigned/just raised; a ticket transitions to `OPEN` the moment the routing engine assigns it to a queue
-- **Secrets via environment variables only :**  `application.properties` contains no real credentials; both the DB password and JWT secret are injected at runtime
+This project went through a full competitive gap-analysis roadmap comparing Ticketmaster against Zendesk/Freshdesk/JSM. Status:
 
----
+| Phase | Item | Status                                                                                                                            |
+|---|---|-----------------------------------------------------------------------------------------------------------------------------------|
+| A | Business-hours SLA calendar | ✅ Done                                                                                                                            |
+| A | Escalation policy on breach | ✅ Done                                                                                                                            |
+| A | Avg First Response reporting bug fix | ✅ Done                                                                                                                            |
+| B | Canned responses / macros | ✅ Done                                                                                                                            |
+| B | Collision detection | ✅ Done                                                                                                                            |
+| B | Skill/load-based auto-assignment | ✅ Done                                                                                                                            |
+| C | Knowledge base module | ✅ Done                                                                                                                            |
+| C | CSAT survey | ✅ Done                                                                                                                            |
+| D | LLM-assisted triage (summarize, suggest reply) | ⏸️ Backend built, parked pending Groq API key setup                                                                               |
+| D | Duplicate detection + merge | ✅ Done (keyword-based matching; upgradeable to semantic/embedding-based later)                                                    |
+| E | MFA / 2FA | ✅ Done                                                                                                                            |
+| E | Outbound webhooks | ✅ Done                                                                                                                            |
+| E | Ticket templates / custom fields per category | ✅ Done                                                                                                                            |
+| E | Email-to-ticket ingestion | 📋 Planned, requires a live IMAP mailbox to run/demo, unlike everything else, so it's scoped and documented rather than built now |
 
-## Known Limitations / Roadmap
-
-- **No database seeding :** first admin account must be bootstrapped manually (see Getting Started, step 5)
-- No N+1 query optimization yet on the ticket list endpoint (tracked for an upcoming commit)
-- Logout currently clears the client-side token only; server-side refresh token revocation is planned
+**Why email-to-ticket is listed as planned, not built:** every other item is self-contained and free to run/test entirely in-browser with a local database. Email ingestion needs a real, live inbox to poll, the design (IMAP polling, sender-to-user matching, subject-line ticket threading for replies) is scoped and ready to pick up if a specific need calls for it.
 
 ---
 
 ## Author
 
-**P. Sai Charan Reddy** | B.Tech CSE(AI) MITS (2027) |
-Stanford University Innovation Fellow |
-[GitHub](https://github.com/saicharanreddy01)
+- P. Sai Charan Reddy 
+- B.Tech CSE(AI), Class of 2027, MITS
+- Stanford University Innovation Fellow
