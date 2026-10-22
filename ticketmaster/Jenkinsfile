@@ -1,0 +1,24 @@
+pipeline {
+    agent any
+    tools {
+        jdk 'jdk21'
+        maven 'maven3'
+    }
+    stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Build Project') {
+            steps {
+                bat 'mvn clean package -DskipTests'
+            }
+        }
+        stage('Run Tests') {
+            steps {
+                bat 'mvn test'
+            }
+        }
+    }
+}
