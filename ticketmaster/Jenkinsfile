@@ -12,15 +12,14 @@ pipeline {
         }
         stage('Build Project') {
             steps {
-                // Tells Jenkins to go into your project folder first
-                dir('ticketmaster/ticketmaster') {
+                dir('ticketmaster') {
                     bat 'mvn clean package -DskipTests'
                 }
             }
         }
         stage('Run Tests') {
             steps {
-                dir('ticketmaster/ticketmaster') {
+                dir('ticketmaster') {
                     bat 'mvn test'
                 }
             }
