@@ -147,7 +147,6 @@ This project went through a full competitive gap-analysis roadmap comparing Tick
 | E | Ticket templates / custom fields per category | ✅ Done                                                                                                                            |
 | E | Email-to-ticket ingestion | 📋 Planned, requires a live IMAP mailbox to run/demo, unlike everything else, so it's scoped and documented rather than built now |
 
-**Why email-to-ticket is listed as planned, not built:** every other item is self-contained and free to run/test entirely in-browser with a local database. Email ingestion needs a real, live inbox to poll, the design (IMAP polling, sender-to-user matching, subject-line ticket threading for replies) is scoped and ready to pick up if a specific need calls for it.
 
 ---
 
